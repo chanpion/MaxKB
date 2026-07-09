@@ -1,4 +1,3 @@
-# coding=utf-8
 """Base classes for workflow step nodes.
 
 Mirrors ``application.flow.i_step_node.INode`` / ``NodeResult`` but is fully
@@ -6,10 +5,11 @@ async and provider-agnostic. Each concrete node implements ``execute`` which
 returns a :class:`NodeResult`; the engine merges ``node_variable`` into the
 shared :class:`~app.workflows.state.WorkflowState`.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.workflows.state import WorkflowState
 
@@ -19,13 +19,13 @@ class NodeResult:
 
     def __init__(
         self,
-        node_variable: Dict[str, Any],
-        workflow_variable: Optional[Dict[str, Any]] = None,
-        branch_id: Optional[str] = None,
-        is_result: Optional[bool] = None,
+        node_variable: dict[str, Any],
+        workflow_variable: dict[str, Any] | None = None,
+        branch_id: str | None = None,
+        is_result: bool | None = None,
         interrupt: bool = False,
-        chunks: Optional[List[str]] = None,
-        exception_message: Optional[str] = None,
+        chunks: list[str] | None = None,
+        exception_message: str | None = None,
         status: int = 200,
     ) -> None:
         self.node_variable = node_variable
@@ -41,7 +41,7 @@ class NodeResult:
     def is_assertion_result(self) -> bool:
         return self.branch_id is not None
 
-    def write_context(self, node: "StepNode", state: WorkflowState) -> None:
+    def write_context(self, node: StepNode, state: WorkflowState) -> None:
         if self.node_variable:
             node.context.update(self.node_variable)
             state.set_node_context(node.id, node.step_name, node.context)
@@ -53,7 +53,7 @@ class NodeResult:
 class NodeInput:
     """Resolved inputs for a node (upstream outputs merged by the engine)."""
 
-    fields: Dict[str, Any] = field(default_factory=dict)
+    fields: dict[str, Any] = field(default_factory=dict)
 
 
 class StepNode:
@@ -63,9 +63,9 @@ class StepNode:
 
     def __init__(
         self,
-        node: Dict[str, Any],
+        node: dict[str, Any],
         state: WorkflowState,
-        up_node_id_list: Optional[List[str]] = None,
+        up_node_id_list: list[str] | None = None,
     ) -> None:
         self.id = node["id"]
         self.raw = node
@@ -78,7 +78,7 @@ class StepNode:
         self.condition = self.properties.get("condition", "AND")
         self.state = state
         self.up_node_id_list = up_node_id_list or []
-        self.context: Dict[str, Any] = {}
+        self.context: dict[str, Any] = {}
         self.status = 200
         self.err_message = ""
 
@@ -92,7 +92,7 @@ class StepNode:
         return self.state.resolve_template(text)
 
     @property
-    def is_result(self) -> Optional[bool]:
+    def is_result(self) -> bool | None:
         if "is_result" in self.node_data:
             return bool(self.node_data["is_result"])
         return None

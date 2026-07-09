@@ -1,4 +1,3 @@
-# coding=utf-8
 """Embedding helpers: text normalization, chunking, ts_vector, and provider calls.
 
 Ports the small utilities used by the legacy ``knowledge.vector`` store so the
@@ -8,11 +7,13 @@ new ingestion pipeline produces ``embedding`` rows identical to Django:
   * ``to_ts_vector`` mirrors ``common.utils.ts_vecto_util.to_ts_vector`` (jieba)
 Embedding vectors come from the Agno embedder abstraction in ``app.providers``.
 """
+
 from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any, List, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 # --- normalize_for_embedding (port of knowledge/vector/base_vector.py) --------
 _RE_EMOJI = re.compile(
@@ -37,12 +38,12 @@ _CHUNK_SPLIT = r".{1,%d}[。| |\.|！|;|；|!|\n]"
 _CHUNK_MAX = r".{1,%d}"
 
 
-def chunk_text(text: str, chunk_size: int = 256) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 256) -> list[str]:
     """Split a paragraph into <=chunk_size char pieces (preserves sentence ends)."""
     chunk_list = [text]
     split_pattern = _CHUNK_SPLIT % chunk_size
     max_pattern = _CHUNK_MAX % chunk_size
-    result: List[str] = []
+    result: list[str] = []
     for chunk in chunk_list:
         for c_r in re.findall(split_pattern, chunk, flags=re.DOTALL):
             if len(c_r.strip()) > 0:
@@ -52,10 +53,10 @@ def chunk_text(text: str, chunk_size: int = 256) -> List[str]:
     return result or [text]
 
 
-def sub_array(array: List[Any], item_num: int = 10) -> List[List[Any]]:
+def sub_array(array: list[Any], item_num: int = 10) -> list[list[Any]]:
     """Batch ``array`` into sub-arrays of at most ``item_num`` items."""
-    result: List[List[Any]] = []
-    temp: List[Any] = []
+    result: list[list[Any]] = []
+    temp: list[Any] = []
     for item in array:
         temp.append(item)
         if len(temp) >= item_num:
@@ -79,7 +80,7 @@ _jieba_tokenizer_cache: dict = {}
 _jieba_tokenizer_lock = None
 
 
-def _build_tokenizer(user_words: List[str]):
+def _build_tokenizer(user_words: list[str]):
     global _jieba_tokenizer_lock
     if _jieba_tokenizer_lock is None:
         import threading
@@ -107,7 +108,7 @@ async def embed_texts(
     credential: dict,
     texts: Sequence[str],
     dimensions: int | None = None,
-) -> List[List[float]]:
+) -> list[list[float]]:
     """Embed ``texts`` using the Agno embedder abstraction (sync call in thread)."""
     if not texts:
         return []
@@ -115,7 +116,7 @@ async def embed_texts(
 
     embedder = get_embedder(provider, model_name, credential, dimensions=dimensions)
 
-    def _run() -> List[List[float]]:
+    def _run() -> list[list[float]]:
         # Agno embedders expose ``embed(documents=...)``; fall back to per-doc.
         if hasattr(embedder, "embed"):
             try:

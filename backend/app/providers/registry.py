@@ -1,4 +1,3 @@
-# coding=utf-8
 """Provider registry: maps legacy vendors to Agno Model / Embedder instances.
 
 Strategy (see docs/STAGE0_AGNO_VERIFICATION.md):
@@ -10,6 +9,7 @@ Strategy (see docs/STAGE0_AGNO_VERIFICATION.md):
 Agno class paths follow the latest stable release; adjust NATIVE_LLM_MAP if a
 class name differs after `uv sync`.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -95,6 +95,115 @@ def get_embedder(
     base_url = credential.get("base_url") or OPENAI_COMPAT_ENDPOINTS.get(p)
     from agno.embedder.openai import OpenAIEmbedder
 
-    return OpenAIEmbedder(
-        id=model_name, api_key=api_key, base_url=base_url, dimensions=dimensions, **kwargs
+    return OpenAIEmbedder(id=model_name, api_key=api_key, base_url=base_url, dimensions=dimensions, **kwargs)
+
+
+# --------------------------------------------------------------------------- #
+# Multimedia provider registry (TTS / STT / TTI / TTV).
+#
+# Most vendors are OpenAI-compatible; dedicated agno.tools.* classes are used
+# for ElevenLabs / Fal / Replicate / Luma / MLX where available.
+# --------------------------------------------------------------------------- #
+
+TTS_MAP: dict[str, tuple[str, str]] = {
+    "elevenlabs": ("agno.tools.eleven_labs", "ElevenLabsTools"),
+    "eleven_labs": ("agno.tools.eleven_labs", "ElevenLabsTools"),
+}
+
+STT_MAP: dict[str, tuple[str, str]] = {
+    "mlx": ("agno.tools.mlx_transcribe", "MLXTranscribeTools"),
+}
+
+TTI_MAP: dict[str, tuple[str, str]] = {
+    "dalle": ("agno.tools.dalle", "DalleTools"),
+    "fal": ("agno.tools.fal", "FalTools"),
+    "replicate": ("agno.tools.replicate", "ReplicateTools"),
+}
+
+TTV_MAP: dict[str, tuple[str, str]] = {
+    "fal": ("agno.tools.fal", "FalTools"),
+    "replicate": ("agno.tools.replicate", "ReplicateTools"),
+    "luma": ("agno.tools.lumalab", "LumaLabTools"),
+    "lumalab": ("agno.tools.lumalab", "LumaLabTools"),
+}
+
+
+def get_tts(provider: str, model_name: str, credential: dict, **kwargs: Any):
+    """Return an Agno TTS tool for the given legacy vendor."""
+    p = _norm(provider)
+    api_key = _api_key(credential)
+    if p in TTS_MAP:
+        mod_path, cls_name = TTS_MAP[p]
+        mod = importlib.import_module(mod_path)
+        cls = getattr(mod, cls_name)
+        if p in ("elevenlabs", "eleven_labs"):
+            return cls(api_key=api_key, model_id=model_name, **kwargs)
+        return cls(api_key=api_key, **kwargs)
+    from agno.tools.openai import OpenAITools
+
+    return OpenAITools(
+        api_key=api_key,
+        text_to_speech_model=model_name,
+        enable_speech_generation=True,
+        enable_transcription=False,
+        enable_image_generation=False,
+        **kwargs,
     )
+
+
+def get_stt(provider: str, model_name: str, credential: dict, **kwargs: Any):
+    """Return an Agno STT tool for the given legacy vendor."""
+    p = _norm(provider)
+    api_key = _api_key(credential)
+    if p in STT_MAP:
+        mod_path, cls_name = STT_MAP[p]
+        mod = importlib.import_module(mod_path)
+        cls = getattr(mod, cls_name)
+        return cls(api_key=api_key, **kwargs)
+    from agno.tools.openai import OpenAITools
+
+    return OpenAITools(
+        api_key=api_key,
+        transcription_model=model_name,
+        enable_transcription=True,
+        enable_speech_generation=False,
+        enable_image_generation=False,
+        **kwargs,
+    )
+
+
+def get_tti(provider: str, model_name: str, credential: dict, **kwargs: Any):
+    """Return an Agno image-generation tool for the given legacy vendor."""
+    p = _norm(provider)
+    api_key = _api_key(credential)
+    if p in TTI_MAP:
+        mod_path, cls_name = TTI_MAP[p]
+        mod = importlib.import_module(mod_path)
+        cls = getattr(mod, cls_name)
+        if p == "dalle":
+            return cls(model=model_name, api_key=api_key, **kwargs)
+        return cls(api_key=api_key, **kwargs)
+    from agno.tools.openai import OpenAITools
+
+    return OpenAITools(
+        api_key=api_key,
+        image_model=model_name,
+        enable_image_generation=True,
+        enable_transcription=False,
+        enable_speech_generation=False,
+        **kwargs,
+    )
+
+
+def get_ttv(provider: str, model_name: str, credential: dict, **kwargs: Any):
+    """Return an Agno video-generation tool for the given legacy vendor."""
+    p = _norm(provider)
+    api_key = _api_key(credential)
+    if p in TTV_MAP:
+        mod_path, cls_name = TTV_MAP[p]
+        mod = importlib.import_module(mod_path)
+        cls = getattr(mod, cls_name)
+        return cls(api_key=api_key, **kwargs)
+    from agno.tools.fal import FalTools
+
+    return FalTools(api_key=api_key, **kwargs)

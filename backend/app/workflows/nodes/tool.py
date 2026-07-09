@@ -1,4 +1,3 @@
-# coding=utf-8
 """Tool node: invokes one or more registered tools (Agno Function tools).
 
 The actual tool catalogue is populated in Stage 8 (``app.tools``). This node
@@ -7,9 +6,10 @@ templated input, and writes the result into the node context. Tools are expected
 to be async callables ``(state, inputs) -> dict``; Agno ``Function`` tools are
 adapted upstream so they fit the same contract.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from app.workflows.nodes.base import NodeResult, StepNode
 
@@ -37,7 +37,7 @@ class ToolNode(StepNode):
             tool_input = {}
 
         registry = _get_registry()
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
         for tool_id in tool_ids:
             if registry is None or not hasattr(registry, "get_tool"):
                 results[str(tool_id)] = {"error": "tool registry unavailable"}

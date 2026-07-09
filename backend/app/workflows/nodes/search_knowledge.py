@@ -1,11 +1,11 @@
-# coding=utf-8
 """Knowledge search node: embeds the (templated) question and retrieves the top-k
 paragraphs through :class:`app.rag.retriever.PgVectorRetriever` (reusing the
 existing ``embedding`` / ``paragraph`` tables — no Agno PgVector rewrite).
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from app.workflows.nodes.base import NodeResult, StepNode
 
@@ -65,7 +65,7 @@ class SearchKnowledgeNode(StepNode):
             search_mode=search_mode,
             query_text=question,
         )
-        paragraph_list: List[Dict[str, Any]] = []
+        paragraph_list: list[dict[str, Any]] = []
         for r in rows:
             paragraph_list.append(
                 {
@@ -75,9 +75,7 @@ class SearchKnowledgeNode(StepNode):
                     "similarity": r.get("similarity"),
                 }
             )
-        data = "\n".join(
-            f"{_reset_title(p.get('title', ''))}{p.get('content')}" for p in paragraph_list
-        )[:max_chars]
+        data = "\n".join(f"{_reset_title(p.get('title', ''))}{p.get('content')}" for p in paragraph_list)[:max_chars]
         return NodeResult(
             {
                 "paragraph_list": paragraph_list,

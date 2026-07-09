@@ -1,4 +1,3 @@
-# coding=utf-8
 """Document parsers: bytes -> markdown/plain text (port of MaxKB split handles).
 
 Mirrors ``apps/common/handle/impl/text/*_split_handle.py``:
@@ -15,6 +14,7 @@ archives map onto the same upstream ``Document`` (as the legacy serializer did).
 Images inside DOCX are intentionally skipped (would require OSS File storage);
 text content is preserved.
 """
+
 from __future__ import annotations
 
 import csv
@@ -23,7 +23,6 @@ import os
 import re
 import zipfile
 from dataclasses import dataclass
-from typing import List
 
 from charset_normalizer import detect
 
@@ -52,8 +51,8 @@ def _pdf_to_markdown(content: bytes) -> str:
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(content))
-    font_sizes: List[float] = []
-    page_lines: List[List[tuple]] = []
+    font_sizes: list[float] = []
+    page_lines: list[list[tuple]] = []
     for page in reader.pages:
         lines = _pdf_extract_page_lines(page)
         page_lines.append(lines)
@@ -67,8 +66,8 @@ def _pdf_to_markdown(content: bytes) -> str:
 
         body_size = Counter(font_sizes).most_common(1)[0][0]
 
-    md: List[str] = []
-    for page_num, page in enumerate(reader.pages):
+    md: list[str] = []
+    for page_num, _ in enumerate(reader.pages):
         for text, size in page_lines[page_num]:
             if not text:
                 continue
@@ -84,9 +83,9 @@ def _pdf_to_markdown(content: bytes) -> str:
 
 
 def _pdf_extract_page_lines(page):
-    lines: List[tuple] = []
-    current_text: List[str] = []
-    current_sizes: List[float] = []
+    lines: list[tuple] = []
+    current_text: list[str] = []
+    current_sizes: list[float] = []
 
     def flush():
         text = "".join(current_text).strip()
@@ -128,9 +127,9 @@ def _html_to_markdown(content: bytes) -> str:
     meta = [m.attrs.get("charset") for m in soup.find_all("meta") if m.attrs and "charset" in m.attrs]
     enc = meta[0] if meta else detect(buf).get("encoding") or "utf-8"
     try:
-        text = buf.decode(enc)
+        buf.decode(enc)
     except (LookupError, UnicodeDecodeError):
-        text = buf.decode("utf-8", errors="ignore")
+        buf.decode("utf-8", errors="ignore")
     # drop anchor-only links so markdownify keeps readable text
     for a in soup.find_all("a", href=re.compile(r"^#")):
         a.unwrap()
@@ -145,7 +144,7 @@ def _docx_to_markdown(content: bytes) -> str:
     from docx.text.paragraph import Paragraph
 
     doc = DocxDocument(io.BytesIO(content))
-    out: List[str] = []
+    out: list[str] = []
 
     def title_level(p: Paragraph):
         try:
@@ -190,11 +189,11 @@ def _docx_to_markdown(content: bytes) -> str:
 
 
 # ------------------------------------------------------------------------- XLSX
-def _xlsx_to_markdown(content: bytes) -> List[ParsedDocument]:
+def _xlsx_to_markdown(content: bytes) -> list[ParsedDocument]:
     import openpyxl
 
     wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-    docs: List[ParsedDocument] = []
+    docs: list[ParsedDocument] = []
     for sheet in wb.worksheets:
         rows = list(sheet.iter_rows(values_only=True))
         if not rows:
@@ -223,8 +222,8 @@ def _csv_to_markdown(content: bytes) -> ParsedDocument:
 
 
 # -------------------------------------------------------------------------- ZIP
-def _zip_to_markdown(content: bytes) -> List[ParsedDocument]:
-    docs: List[ParsedDocument] = []
+def _zip_to_markdown(content: bytes) -> list[ParsedDocument]:
+    docs: list[ParsedDocument] = []
     with zipfile.ZipFile(io.BytesIO(content)) as zf:
         for name in zf.namelist():
             if name.endswith("/"):
@@ -241,7 +240,7 @@ def _zip_to_markdown(content: bytes) -> List[ParsedDocument]:
 
 
 # --------------------------------------------------------------------- dispatch
-def parse_file(filename: str, content: bytes) -> List[ParsedDocument]:
+def parse_file(filename: str, content: bytes) -> list[ParsedDocument]:
     """Parse ``content`` (raw bytes) into one or more ``ParsedDocument``."""
     lower = filename.lower()
     if lower.endswith((".md", ".txt", ".text")):

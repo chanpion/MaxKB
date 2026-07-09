@@ -1,4 +1,3 @@
-# coding=utf-8
 """Trigger package (Stage 8).
 
 Migrates ``apps/trigger`` to an arq-backed scheduled/event trigger system while
@@ -10,6 +9,7 @@ keeping the legacy ``event_trigger`` / ``event_trigger_task`` tables:
   * ``scheduled``            — builds arq cron specs from ``trigger_setting``
                                (replacing Celery beat ``PeriodicTask``).
 """
+
 from app.trigger.base import BaseTrigger
 from app.trigger.manager import TriggerManager, execute_trigger, manager, register_handler
 

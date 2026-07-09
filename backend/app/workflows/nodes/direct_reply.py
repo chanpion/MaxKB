@@ -1,8 +1,6 @@
-# coding=utf-8
 """Direct reply node: emits the (templated) content as the answer."""
-from __future__ import annotations
 
-from typing import Any, List
+from __future__ import annotations
 
 from app.workflows.nodes.base import NodeResult, StepNode
 
@@ -12,7 +10,7 @@ class DirectReplyNode(StepNode):
 
     async def execute(self) -> NodeResult:
         content = self.resolve_template(self.node_data.get("content", ""))
-        chunks: List[str] = [content] if content else []
+        chunks: list[str] = [content] if content else []
         if self.state.on_chunk is not None:
             for ch in chunks:
                 self.state.on_chunk(ch)

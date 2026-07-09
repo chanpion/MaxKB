@@ -1,0 +1,38 @@
+# Dev infrastructure for the MaxKB FastAPI backend.
+# Brings up PostgreSQL 17 (with pgvector) + Redis so the service, arq worker and
+# real end-to-end flows (ingest, chat, triggers) can be exercised locally.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Connection defaults match backend/app/core/config.py:
+#   postgres://maxkb:maxkb123@127.0.0.1:5432/maxkb
+#   redis://127.0.0.1:6379/0
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: maxkb
+      POSTGRES_PASSWORD: maxkb123
+      POSTGRES_DB: maxkb
+    ports:
+      - "5432:5432"
+    volumes:
+      - maxkb_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maxkb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  maxkb_pg:

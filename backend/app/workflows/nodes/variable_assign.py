@@ -1,6 +1,6 @@
-# coding=utf-8
 """Variable assign node: writes resolved key/value pairs into the node context
 (and optionally into the global workflow context)."""
+
 from __future__ import annotations
 
 from app.workflows.nodes.base import NodeResult, StepNode

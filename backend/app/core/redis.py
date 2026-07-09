@@ -1,10 +1,10 @@
-# coding=utf-8
 """Async Redis client (cache + arq broker/result backend).
 
 Mirrors the legacy django-redis configuration. Sentinel topology is parsed from
 MAXKB_REDIS_SENTINEL_* in config.py but, for simplicity, the single-node client
 is used here; swap to a Sentinel connection if your deployment requires it.
 """
+
 from redis.asyncio import Redis
 
 from app.core.config import get_settings

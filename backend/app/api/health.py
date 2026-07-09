@@ -1,5 +1,5 @@
-# coding=utf-8
 """Health-check router."""
+
 from fastapi import APIRouter
 
 router = APIRouter(tags=["health"])

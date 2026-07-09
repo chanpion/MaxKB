@@ -1,10 +1,10 @@
-# coding=utf-8
 """LLM chat node: builds an Agno ``Agent`` from the resolved model config and
 runs the (templated) prompt, streaming the answer back through ``state.on_chunk``.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.workflows.nodes.base import NodeResult, StepNode
 
@@ -12,7 +12,7 @@ from app.workflows.nodes.base import NodeResult, StepNode
 class LLMChatNode(StepNode):
     type = "ai-chat-node"
 
-    def _model_config(self) -> Dict[str, Any]:
+    def _model_config(self) -> dict[str, Any]:
         # The engine injects the active model credentials into params.
         cfg = self.state.params.get("model_config") or {}
         if not cfg:
@@ -40,8 +40,7 @@ class LLMChatNode(StepNode):
             agno_tools = get_agno_tools([str(t) for t in tool_ids])
         agent = Agent(model=llm, instructions=system or None, markdown=True, tools=agno_tools or None)
 
-        messages: List[str] = []
-        answer_parts: List[str] = []
+        answer_parts: list[str] = []
 
         def _sink(text: str) -> None:
             answer_parts.append(text)

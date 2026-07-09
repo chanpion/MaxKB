@@ -1,4 +1,3 @@
-# coding=utf-8
 """Ingestion pipeline: parse -> split -> embed -> store.
 
 Replicates the legacy ``knowledge`` flow (serializer ``Create.save`` /
@@ -9,24 +8,24 @@ Replicates the legacy ``knowledge`` flow (serializer ``Create.save`` /
   * Embedding rows use raw asyncpg SQL (pgvector ``::vector`` cast + the
     ``to_tsvector`` search column) — identical to ``PgVectorRetriever`` usage.
 """
+
 from __future__ import annotations
 
-import uuid_utils.compat as uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 from uuid import UUID as _UUID
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import engine
+from app.models.base import uuid7
 from app.models.knowledge import Document, Paragraph
 from app.rag.embed import (
     chunk_text,
     embed_texts,
     normalize_for_embedding,
     sub_array,
-    to_ts_vector,
 )
 from app.rag.parsers import ParsedDocument, parse_file
 from app.rag.splitter import split_text
@@ -61,11 +60,11 @@ async def ingest_document(
     user_id: str | None,
     filename: str,
     content: bytes,
-    embedding: Dict[str, Any],
+    embedding: dict[str, Any],
     with_filter: bool = False,
     limit: int = 4096,
     source_file_id: str | None = None,
-    meta: Dict[str, Any] | None = None,
+    meta: dict[str, Any] | None = None,
     doc_type: int = 0,
 ) -> IngestionResult:
     """Parse ``content``, split, embed and persist it under one ``document``.
@@ -73,9 +72,9 @@ async def ingest_document(
     ``embedding`` must carry ``provider``, ``model_name``, ``credential`` and
     optionally ``dimensions`` (defaults to 1536 to match the ``embedding`` column).
     """
-    parsed: List[ParsedDocument] = parse_file(filename, content)
+    parsed: list[ParsedDocument] = parse_file(filename, content)
 
-    paragraphs_data: List[Dict[str, str]] = []
+    paragraphs_data: list[dict[str, str]] = []
     for pd in parsed:
         paragraphs_data.extend(
             split_text(pd.content, filename=pd.name or filename, with_filter=with_filter, limit=limit)
@@ -100,7 +99,7 @@ async def ingest_document(
     session.add(document)
 
     # ---- Paragraph rows -----------------------------------------------------
-    paragraph_objs: List[Paragraph] = []
+    paragraph_objs: list[Paragraph] = []
     for idx, p in enumerate(paragraphs_data):
         para = Paragraph(
             knowledge_id=knowledge_id,
@@ -123,15 +122,15 @@ async def ingest_document(
     dimensions = embedding.get("dimensions")
 
     # Gather (paragraph, chunk_texts) pairs.
-    chunk_plan: List[tuple] = []
+    chunk_plan: list[tuple] = []
     for para in paragraph_objs:
         texts = chunk_text(para.content, chunk_size=256)
         para.chunks = texts  # mirror legacy Paragraph.chunks
         chunk_plan.append((para, texts))
 
     # Flatten into one text list, keep mapping back to paragraph.
-    flat_texts: List[str] = []
-    owner: List[Paragraph] = []
+    flat_texts: list[str] = []
+    owner: list[Paragraph] = []
     for para, texts in chunk_plan:
         for t in texts:
             flat_texts.append(t)
@@ -145,7 +144,7 @@ async def ingest_document(
             for batch in sub_array(list(range(len(flat_texts))), item_num=10):
                 for i in batch:
                     para = owner[i]
-                    emb_id = str(uuid.uuid7())
+                    emb_id = str(uuid7())
                     await conn.execute(
                         _SQL_INSERT_EMBEDDING,
                         {

@@ -1,5 +1,5 @@
-# coding=utf-8
 """i18n helpers (gettext/polib), reusing the existing locale catalogs."""
+
 import gettext
 from pathlib import Path
 

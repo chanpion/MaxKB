@@ -1,4 +1,3 @@
-# coding=utf-8
 """Async database engine and session factory.
 
 SAFETY: this module MUST NOT call ``create_all`` / ``metadata.create_all``.
@@ -7,6 +6,7 @@ Django backend). Schema evolution is handled exclusively by Alembic, starting
 from the empty baseline (0001_empty). New tables are only introduced via
 additive Alembic migrations.
 """
+
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

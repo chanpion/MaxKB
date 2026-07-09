@@ -1,8 +1,6 @@
-# coding=utf-8
 """Start node: seeds the workflow with the user question / form data."""
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 from app.workflows.nodes.base import NodeResult, StepNode
 

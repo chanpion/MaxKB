@@ -1,52 +1,52 @@
-# coding=utf-8
 """Shared mutable state for a workflow run.
 
 Mirrors ``WorkflowManage.context`` / ``chat_context`` / ``global`` plus the
 reference-resolution logic used by ``WorkflowManage.reset_prompt`` and
 ``get_reference_field``.
 """
+
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.workflows.compare import do_assertion
 
 # A reference object stored inside node params, e.g.
 # {"node_id": "abc", "fields": ["content"]} or {"node_id": "global", "fields": ["x"]}
-Reference = Dict[str, Any]
+Reference = dict[str, Any]
 
 
 class WorkflowState:
     """Holds per-run context shared across nodes."""
 
-    def __init__(self, params: Dict[str, Any], *, node_names: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, params: dict[str, Any], *, node_names: dict[str, str] | None = None) -> None:
         # node_id -> node context dict
-        self.context: Dict[str, Dict[str, Any]] = {}
-        self.global_context: Dict[str, Any] = {}
-        self.chat_context: Dict[str, Any] = {}
+        self.context: dict[str, dict[str, Any]] = {}
+        self.global_context: dict[str, Any] = {}
+        self.chat_context: dict[str, Any] = {}
         self.params = params
-        self.answers: List[str] = []
-        self.details: Dict[str, Any] = {}
+        self.answers: list[str] = []
+        self.details: dict[str, Any] = {}
         # node_id -> stepName (for template placeholder replacement)
         self.node_names = node_names or {}
         # cached placeholder index: "NodeName.field" -> (node_id, field)
-        self._field_index: Dict[str, Any] = {}
+        self._field_index: dict[str, Any] = {}
         # optional real-time streaming sink (set by the engine for SSE)
-        self.on_chunk: Optional[Any] = None
+        self.on_chunk: Any | None = None
         self._build_field_index()
 
     # ------------------------------------------------------------------ #
     # Reference resolution
     # ------------------------------------------------------------------ #
-    def _navigate(self, obj: Any, fields: List[str]) -> Any:
+    def _navigate(self, obj: Any, fields: list[str]) -> Any:
         for field in fields:
             if obj is None:
                 return None
             obj = obj.get(field) if isinstance(obj, dict) else None
         return obj
 
-    def get_field(self, field_list: List[str]) -> Any:
+    def get_field(self, field_list: list[str]) -> Any:
         """Resolve a reference field list to its value (mirrors ``INode.get_field``)."""
         if not field_list:
             return None
@@ -86,7 +86,7 @@ class WorkflowState:
                 result = result.replace(placeholder, "" if value is None else str(value))
         return result
 
-    def set_node_context(self, node_id: str, node_name: str, ctx: Dict[str, Any]) -> None:
+    def set_node_context(self, node_id: str, node_name: str, ctx: dict[str, Any]) -> None:
         self.context[node_id] = ctx
         if node_name:
             self.node_names[node_id] = node_name
@@ -100,7 +100,7 @@ class WorkflowState:
         else:
             self.answers.append(content)
 
-    def do_assertion(self, condition: str, condition_list: List[Dict[str, Any]]) -> bool:
+    def do_assertion(self, condition: str, condition_list: list[dict[str, Any]]) -> bool:
         return do_assertion(self.get_field, self.resolve_template, condition, condition_list)
 
 

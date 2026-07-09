@@ -1,14 +1,15 @@
-# coding=utf-8
 """Condition/assertion comparators ported from ``apps/application/flow/compare``.
 
 These are pure functions so the workflow engine can evaluate condition-node
 branches without the Django/DRF stack. Each handler implements ``compare(source,
 value) -> bool``; ``do_assertion`` mirrors ``flow.compare.do_assertion``.
 """
+
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Dict, List
+from collections.abc import Callable
+from typing import Any
 
 
 class _Compare:
@@ -154,7 +155,7 @@ class WildcardCompare(_Compare):
             return False
 
 
-_COMPARE_HANDLERS: Dict[str, _Compare] = {
+_COMPARE_HANDLERS: dict[str, _Compare] = {
     "is_null": IsNullCompare(),
     "is_not_null": IsNotNullCompare(),
     "contain": ContainCompare(),
@@ -198,10 +199,10 @@ def compare(source_value: Any, compare_type: str, target_value: Any) -> bool:
 
 
 def do_assertion(
-    get_field: Callable[[List[str]], Any],
+    get_field: Callable[[list[str]], Any],
     resolve_template: Callable[[str], str],
     condition: str,
-    condition_list: List[Dict[str, Any]],
+    condition_list: list[dict[str, Any]],
 ) -> bool:
     """Mirror ``flow.compare.do_assertion``.
 

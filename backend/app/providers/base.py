@@ -1,5 +1,5 @@
-# coding=utf-8
 """Provider base: credential encryption/validation mirroring BaseModelCredential."""
+
 from __future__ import annotations
 
 import base64

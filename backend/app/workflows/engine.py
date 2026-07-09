@@ -1,4 +1,3 @@
-# coding=utf-8
 """Workflow engine: loads a MaxKB ``flow`` graph and executes it.
 
 The engine is intentionally lightweight — it drives graph traversal itself
@@ -14,22 +13,23 @@ start node -> execute -> resolve next nodes from edges (with branch-anchor
 matching for condition nodes and AND/OR fan-in) -> recurse. A node is a
 "result" node when ``node_data.is_result`` is set or it has no successors.
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.workflows.nodes import get_node
 from app.workflows.nodes.base import NodeResult, StepNode
 from app.workflows.state import WorkflowState, serialize
 
 
-def sse_event(payload: Dict[str, Any]) -> str:
+def sse_event(payload: dict[str, Any]) -> str:
     return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
 
-def _anchor(node_id: str, branch_id: Optional[str]) -> str:
+def _anchor(node_id: str, branch_id: str | None) -> str:
     if branch_id:
         return f"{node_id}_{branch_id}_right"
     return f"{node_id}_right"
@@ -38,11 +38,11 @@ def _anchor(node_id: str, branch_id: Optional[str]) -> str:
 class WorkflowEngine:
     def __init__(
         self,
-        flow: Dict[str, Any],
-        params: Dict[str, Any],
+        flow: dict[str, Any],
+        params: dict[str, Any],
         *,
-        model_config: Optional[Dict[str, Any]] = None,
-        embedding_config: Optional[Dict[str, Any]] = None,
+        model_config: dict[str, Any] | None = None,
+        embedding_config: dict[str, Any] | None = None,
     ) -> None:
         self.flow = flow
         self.params = params
@@ -51,13 +51,18 @@ class WorkflowEngine:
         self.nodes = {n["id"]: n for n in flow.get("nodes", [])}
         self.edges = flow.get("edges", [])
         self.node_names = {
-            nid: (n.get("properties", {}) or {}).get("stepName", n.get("type", ""))
-            for nid, n in self.nodes.items()
+            nid: (n.get("properties", {}) or {}).get("stepName", n.get("type", "")) for nid, n in self.nodes.items()
         }
         self.state = WorkflowState(params, node_names=self.node_names)
+        # Workflow params are exposed as ``global.<key>`` so nodes can reference
+        # them (e.g. a resumed form reads the supplied value as global.<name>).
+        for _k, _v in self.params.items():
+            if _k not in ("model_config", "embedding_config"):
+                self.state.global_context.setdefault(_k, _v)
         self.executed: set[str] = set()
-        self.runtime_details: Dict[str, Any] = {}
-        self.answers: List[str] = []
+        self.runtime_details: dict[str, Any] = {}
+        self.answers: list[str] = []
+        self.interrupted: NodeResult | None = None
 
     # ----------------------------- graph helpers ----------------------------- #
     def _start_node_id(self) -> str:
@@ -66,24 +71,24 @@ class WorkflowEngine:
                 return nid
         raise RuntimeError("flow has no start-node")
 
-    def _outgoing(self, node_id: str) -> List[Dict[str, Any]]:
+    def _outgoing(self, node_id: str) -> list[dict[str, Any]]:
         return [e for e in self.edges if e.get("sourceNodeId") == node_id]
 
-    def _up_node_ids(self, node_id: str) -> List[str]:
+    def _up_node_ids(self, node_id: str) -> list[str]:
         return [e.get("sourceNodeId") for e in self.edges if e.get("targetNodeId") == node_id]
 
-    def _make_node(self, node_id: str, up_node_id_list: List[str]) -> StepNode:
+    def _make_node(self, node_id: str, up_node_id_list: list[str]) -> StepNode:
         node = self.nodes[node_id]
         cls = get_node(node.get("type"))
         if cls is None:
             raise RuntimeError(f"unsupported node type: {node.get('type')}")
         return cls(node, self.state, up_node_id_list)
 
-    def _next_nodes(self, current: StepNode, result: NodeResult) -> List[str]:
+    def _next_nodes(self, current: StepNode, result: NodeResult) -> list[str]:
         if result.interrupt:
             return []
         out = self._outgoing(current.id)
-        candidates: List[str] = []
+        candidates: list[str] = []
         for edge in out:
             anchor = edge.get("sourceAnchorId")
             if result.is_assertion_result:
@@ -94,7 +99,7 @@ class WorkflowEngine:
                     candidates.append(edge["targetNodeId"])
         # Resolve AND/OR fan-in: a target with condition=AND waits until all its
         # (active) incoming edges are satisfied; OR fires as soon as one arrives.
-        ready: List[str] = []
+        ready: list[str] = []
         for tid in candidates:
             target = self.nodes[tid]
             if target.get("properties", {}).get("disabled"):
@@ -121,7 +126,7 @@ class WorkflowEngine:
         return len(self._outgoing(node_id)) > 0
 
     # ------------------------------- execution ------------------------------- #
-    async def _exec_node(self, node_id: str, up_node_id_list: List[str], queue):
+    async def _exec_node(self, node_id: str, up_node_id_list: list[str], queue):
         """Execute a single node and return its candidates ``(next_id, up_list)``."""
         node = self._make_node(node_id, up_node_id_list)
         if node.disabled:
@@ -147,6 +152,8 @@ class WorkflowEngine:
                 raise
 
         result.write_context(node, self.state)
+        if result.interrupt:
+            self.interrupted = result
         self.executed.add(node_id)
         self.runtime_details[node.id] = self._details(node, result)
 
@@ -180,10 +187,10 @@ class WorkflowEngine:
         joins resolve correctly.
         """
         ready = [(self._start_node_id(), [])]
-        pending: List[tuple] = []
+        pending: list[tuple] = []
         while ready or pending:
             progressed = False
-            still_pending: List[tuple] = []
+            still_pending: list[tuple] = []
             batch = ready + pending
             ready = []
             pending = []
@@ -209,8 +216,19 @@ class WorkflowEngine:
             pending = still_pending
 
     # ------------------------------- public API ------------------------------ #
-    async def run(self) -> Dict[str, Any]:
+    async def run(self) -> dict[str, Any]:
         await self._drive()
+        if self.interrupted is not None:
+            # Workflow suspended at an interrupting node (e.g. a form awaiting
+            # user input). Callers resume by re-running the engine with the
+            # missing values supplied via params / global context.
+            return {
+                "answer": "",
+                "details": self.runtime_details,
+                "status": 423,
+                "interrupted": True,
+                "form": self.interrupted.node_variable,
+            }
         return self._finalize()
 
     async def stream(self):
@@ -246,14 +264,14 @@ class WorkflowEngine:
         yield sse_event({"type": "done", "answer": final["answer"], "details": final["details"]})
 
     # ------------------------------- helpers --------------------------------- #
-    def _node_meta(self, node: StepNode) -> Dict[str, Any]:
+    def _node_meta(self, node: StepNode) -> dict[str, Any]:
         return {
             "node_id": node.id,
             "node_type": node.type,
             "node_name": node.step_name,
         }
 
-    def _details(self, node: StepNode, result: NodeResult) -> Dict[str, Any]:
+    def _details(self, node: StepNode, result: NodeResult) -> dict[str, Any]:
         return serialize(
             {
                 "node_id": node.id,
@@ -267,7 +285,7 @@ class WorkflowEngine:
             }
         )
 
-    def _finalize(self) -> Dict[str, Any]:
+    def _finalize(self) -> dict[str, Any]:
         answer = "\n\n".join(a for a in self.answers if a)
         return {
             "answer": answer,

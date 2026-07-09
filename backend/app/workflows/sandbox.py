@@ -1,4 +1,3 @@
-# coding=utf-8
 """Sandboxed execution for workflow code nodes (e.g. variable scripts / advanced
 logic nodes migrated from ``flow.step_node``).
 
@@ -21,16 +20,19 @@ every code-bearing node (document_extract, image/video nodes, etc.). Until then,
 only the variable-assign / reply nodes are wired; this module is the shared
 execution boundary they will all route through.
 """
+
 from __future__ import annotations
 
 import textwrap
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 _DEFAULT_TIMEOUT = 30
 
 
-def run_in_sandbox(code: str, globals_ns: Optional[Dict[str, Any]] = None, timeout: int = _DEFAULT_TIMEOUT) -> Dict[str, Any]:
+def run_in_sandbox(
+    code: str, globals_ns: dict[str, Any] | None = None, timeout: int = _DEFAULT_TIMEOUT
+) -> dict[str, Any]:
     """Execute ``code`` in a restricted namespace.
 
     Returns ``{"success": bool, "result": <value>, "error": str|None}``. Uses
@@ -39,18 +41,17 @@ def run_in_sandbox(code: str, globals_ns: Optional[Dict[str, Any]] = None, timeo
     """
     globals_ns = globals_ns or {}
     try:
-        from RestrictedPython import safe_globals
-        from RestrictedPython import compile_restricted
+        from RestrictedPython import compile_restricted, safe_globals
 
         byte_code = compile_restricted(code, "<workflow>", "exec")
-        safe_locals: Dict[str, Any] = {}
+        safe_locals: dict[str, Any] = {}
         exec(byte_code, {**safe_globals, **globals_ns}, safe_locals)  # noqa: S102
         return {"success": True, "result": safe_locals.get("result"), "error": None}
     except ImportError:
         # No RestrictedPython: fall back to a bare, builtins-stripped exec.
         # This is NOT a security boundary — deploy the Docker path in prod.
         safe_globals = {"__builtins__": {}, **globals_ns}
-        local_ns: Dict[str, Any] = {}
+        local_ns: dict[str, Any] = {}
         try:
             exec(textwrap.dedent(code), safe_globals, local_ns)  # noqa: S102
             return {"success": True, "result": local_ns.get("result"), "error": None}
@@ -60,7 +61,7 @@ def run_in_sandbox(code: str, globals_ns: Optional[Dict[str, Any]] = None, timeo
         return {"success": False, "result": None, "error": str(e)}
 
 
-async def run_in_docker_sandbox(code: str, timeout: int = _DEFAULT_TIMEOUT) -> Dict[str, Any]:
+async def run_in_docker_sandbox(code: str, timeout: int = _DEFAULT_TIMEOUT) -> dict[str, Any]:
     """Run ``code`` inside a short-lived, resource-limited container.
 
     Requires Docker; intended as the production-grade sandbox for code nodes.

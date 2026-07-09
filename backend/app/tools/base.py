@@ -1,4 +1,3 @@
-# coding=utf-8
 """Base tool abstraction bridging MaxKB tools to Agno Function tools.
 
 A :class:`BaseTool` exposes two execution paths:
@@ -11,10 +10,11 @@ A :class:`BaseTool` exposes two execution paths:
 Agno is imported lazily so this module is importable in dependency-light
 environments (tests / CI before ``uv sync``).
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class BaseTool(ABC):
@@ -24,10 +24,10 @@ class BaseTool(ABC):
     def __init__(
         self,
         *,
-        tool_id: Optional[str] = None,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        input_schema: Optional[Dict[str, Any]] = None,
+        tool_id: str | None = None,
+        name: str | None = None,
+        description: str | None = None,
+        input_schema: dict[str, Any] | None = None,
     ) -> None:
         self.id = tool_id
         self.name = name or self.name
@@ -35,7 +35,7 @@ class BaseTool(ABC):
         self.input_schema = input_schema or {}
 
     @abstractmethod
-    async def invoke(self, state: Any, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def invoke(self, state: Any, inputs: dict[str, Any]) -> dict[str, Any]:
         """Run the tool. ``state`` is the workflow ``WorkflowState`` (may be None)."""
         raise NotImplementedError
 

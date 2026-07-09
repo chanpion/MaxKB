@@ -1,14 +1,12 @@
-# coding=utf-8
 """Unit tests for the workflow engine graph traversal (no agno / DB required).
 
 Exercises start -> condition -> reply branching and reference resolution using
 the agno-free node set, so it runs in any environment.
 """
+
 from __future__ import annotations
 
 import asyncio
-
-import pytest
 
 from app.workflows.engine import WorkflowEngine, sse_event
 from app.workflows.nodes import ConditionNode, DirectReplyNode, StartNode, VariableAssignNode
@@ -27,9 +25,7 @@ _FLOW = {
                             "id": "b_yes",
                             "type": "yes",
                             "condition": "and",
-                            "conditions": [
-                                {"field": ["n_start", "question"], "compare": "contain", "value": "你好"}
-                            ],
+                            "conditions": [{"field": ["n_start", "question"], "compare": "contain", "value": "你好"}],
                         },
                         {"id": "b_no", "type": "no", "condition": "and", "conditions": []},
                     ]
@@ -57,7 +53,7 @@ _FLOW = {
 
 def _run(question: str) -> dict:
     engine = WorkflowEngine(_FLOW, {"question": question})
-    return asyncio.get_event_loop().run_until_complete(engine.run())
+    return asyncio.run(engine.run())
 
 
 def test_condition_branch_yes():
@@ -77,7 +73,7 @@ def test_sse_event_serializes():
 
 
 def test_node_registry_covers_minimal_set():
-    for t in (StartNode, ConditionNode, DirectReplyNode, VariableAssignNode):
+    for _ in (StartNode, ConditionNode, DirectReplyNode, VariableAssignNode):
         assert WorkflowEngine  # sanity
     from app.workflows.nodes import get_node
 

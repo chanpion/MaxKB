@@ -1,13 +1,13 @@
-# coding=utf-8
 """Built-in example tools demonstrating the Agno Function integration.
 
 These stand in for the legacy ``apps/tools`` catalogue. Each is registered at
 startup so workflows / agents can reference them by id.
 """
+
 from __future__ import annotations
 
 import datetime
-from typing import Any, Dict
+from typing import Any
 
 from app.tools.base import BaseTool
 from app.tools.registry import registry
@@ -17,7 +17,7 @@ class CalculatorTool(BaseTool):
     name = "calculator"
     description = "Evaluate a basic arithmetic expression (+, -, *, /, parentheses)."
 
-    async def invoke(self, state: Any, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def invoke(self, state: Any, inputs: dict[str, Any]) -> dict[str, Any]:
         expr = str(inputs.get("expression", ""))
         # Restrict to a safe arithmetic subset.
         if not all(c.isdigit() or c in "+-*/(). " for c in expr):
@@ -33,7 +33,7 @@ class CurrentTimeTool(BaseTool):
     name = "current_time"
     description = "Return the current date/time, optionally formatted (default ISO)."
 
-    async def invoke(self, state: Any, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def invoke(self, state: Any, inputs: dict[str, Any]) -> dict[str, Any]:
         fmt = inputs.get("format")
         now = datetime.datetime.now()
         return {"result": now.strftime(fmt) if fmt else now.isoformat()}

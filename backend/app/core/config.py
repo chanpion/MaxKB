@@ -1,4 +1,3 @@
-# coding=utf-8
 """Application configuration.
 
 Reads the legacy MaxKB ``MAXKB_*`` environment variables (prefix stripped by the
@@ -6,6 +5,7 @@ old ConfigManager) and the unprefixed ``SERVER_NAME`` role selector, plus an
 optional ``.env`` file. Values mirror ``apps/maxkb/conf.py`` defaults so the new
 backend can share the same PostgreSQL / Redis with the legacy Django service.
 """
+
 from functools import lru_cache
 
 from pydantic import Field
@@ -65,16 +65,11 @@ class Settings(BaseSettings):
     admin_path: str = Field(default="/admin", alias="MAXKB_ADMIN_PATH")
     chat_path: str = Field(default="/chat", alias="MAXKB_CHAT_PATH")
     session_timeout: int = Field(default=28800, alias="MAXKB_SESSION_TIMEOUT")
-    external_locale_path: str = Field(
-        default="/opt/maxkb/local/locales", alias="MAXKB_EXTERNAL_LOCALE_PATH"
-    )
+    external_locale_path: str = Field(default="/opt/maxkb/local/locales", alias="MAXKB_EXTERNAL_LOCALE_PATH")
 
     @property
     def database_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
-        )
+        return f"postgresql+asyncpg://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     @property
     def redis_url(self) -> str:

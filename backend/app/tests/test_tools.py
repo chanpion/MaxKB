@@ -1,5 +1,5 @@
-# coding=utf-8
 """Tests for the tools registry and built-in tools (no agno / DB required)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,19 +10,19 @@ from app.tools.registry import ToolRegistry, get_tool
 
 def test_calculator_tool():
     tool = CalculatorTool(tool_id="builtin:calculator")
-    result = asyncio.get_event_loop().run_until_complete(tool.invoke(None, {"expression": "2 * (3 + 4)"}))
+    result = asyncio.run(tool.invoke(None, {"expression": "2 * (3 + 4)"}))
     assert result == {"result": 14}
 
 
 def test_calculator_rejects_non_arithmetic():
     tool = CalculatorTool(tool_id="builtin:calculator")
-    result = asyncio.get_event_loop().run_until_complete(tool.invoke(None, {"expression": "__import__('os')"}))
+    result = asyncio.run(tool.invoke(None, {"expression": "__import__('os')"}))
     assert "error" in result
 
 
 def test_current_time_tool():
     tool = CurrentTimeTool(tool_id="builtin:current_time")
-    result = asyncio.get_event_loop().run_until_complete(tool.invoke(None, {}))
+    result = asyncio.run(tool.invoke(None, {}))
     assert "result" in result
 
 

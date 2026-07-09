@@ -1,4 +1,3 @@
-# coding=utf-8
 """Conversational chat agent built on Agno.
 
 Replaces the legacy ``application.chat_pipeline`` (search_dataset ->
@@ -12,10 +11,12 @@ The retriever adapter reuses :class:`app.rag.retriever.PgVectorRetriever`,
 which executes the SAME pgvector SQL as the Django backend, so the new
 service shares the existing ``embedding`` / ``paragraph`` tables.
 """
+
 from __future__ import annotations
 
 import json
-from typing import Any, AsyncGenerator, Dict, List, Optional, Sequence
+from collections.abc import AsyncGenerator, Sequence
+from typing import Any
 
 from agno.agent import Agent
 
@@ -41,7 +42,7 @@ class AgnoRetriever:
     def __init__(
         self,
         knowledge_ids: Sequence[str],
-        embedding: Dict[str, Any],
+        embedding: dict[str, Any],
         top_n: int = 5,
         similarity: float = 0.5,
         search_mode: str = "embedding",
@@ -53,7 +54,7 @@ class AgnoRetriever:
         self.search_mode = search_mode
         self._retriever = PgVectorRetriever()
 
-    async def arun(self, query: str, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def arun(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
         provider = self.embedding["provider"]
         model_name = self.embedding["model_name"]
         credential = self.embedding.get("credential", {})
@@ -81,13 +82,13 @@ class AgnoRetriever:
         ]
 
     # Synchronous fallback used by some Agno code paths.
-    def run(self, query: str, **kwargs: Any) -> List[Dict[str, Any]]:
+    def run(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
         import asyncio
 
         return asyncio.get_event_loop().run_until_complete(self.arun(query, **kwargs))
 
 
-def build_memory(user_id: Optional[str] = None):
+def build_memory(user_id: str | None = None):
     """Build an Agno long-term memory (DB-backed) if available.
 
     Falls back to ``None`` (stateless) when the postgres memory backend is not
@@ -111,9 +112,9 @@ class ChatAgent:
         *,
         model_provider: str,
         model_name: str,
-        credential: Dict[str, Any],
+        credential: dict[str, Any],
         knowledge_ids: Sequence[str] | None = None,
-        embedding: Dict[str, Any] | None = None,
+        embedding: dict[str, Any] | None = None,
         instructions: str | None = None,
         memory=None,
         top_n: int = 5,
@@ -144,7 +145,7 @@ class ChatAgent:
         Yields raw SSE frames (``data: {...}\\n\\n``). The FastAPI route wraps
         this generator in a ``StreamingResponse``.
         """
-        kwargs: Dict[str, Any] = {"stream": True}
+        kwargs: dict[str, Any] = {"stream": True}
         if session_id is not None:
             kwargs["session_id"] = session_id
         async for event in self.agent.arun(message, **kwargs):
@@ -154,6 +155,6 @@ class ChatAgent:
         yield "data: " + json.dumps({"done": True}) + "\n\n"
 
 
-def sse_event(payload: Dict[str, Any]) -> str:
+def sse_event(payload: dict[str, Any]) -> str:
     """Helper to format an SSE frame from a dict payload."""
     return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"

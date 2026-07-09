@@ -1,5 +1,5 @@
-# coding=utf-8
 """Trigger abstraction (mirrors ``apps/trigger/handler/base_trigger.py``)."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

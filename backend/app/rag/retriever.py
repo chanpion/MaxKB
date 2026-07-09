@@ -1,4 +1,3 @@
-# coding=utf-8
 """PgVectorRetriever: Agno-compatible retriever reusing MaxKB's pgvector SQL.
 
 The retrieval SQL mirrors apps/knowledge/sql/embedding_search.sql and
@@ -6,14 +5,14 @@ blend_search.sql, executed via asyncpg against the EXISTING `embedding` /
 `paragraph` tables. We deliberately do NOT use Agno's PgVector store so legacy
 vector data stays fully compatible.
 """
+
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import Engine
-
-from app.core.db import engine
 
 _SQL_EMBEDDING = """
 WITH vector_top AS (

@@ -192,3 +192,16 @@ config.yml
 .SANDBOX_BANNED_HOSTS
 copilot-instructions.md
 /backend/.github/
+
+# Ruff cache
+.ruff_cache/
+
+# Next.js 前端（frontend/）构建产物与依赖
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.turbo/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo

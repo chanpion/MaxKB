@@ -1,0 +1,244 @@
+{
+  "login": {
+    "title": "Login MaxKB",
+    "desc": "Enterprise Agent Platform",
+    "username": "Username / Email",
+    "password": "Password",
+    "submit": "Login",
+    "success": "Login success",
+    "usernameRequired": "Please enter username",
+    "passwordRequired": "Please enter password"
+  },
+  "menu": {
+    "home": "Workspace",
+    "knowledge": "Knowledge",
+    "model": "Model",
+    "application": "Application",
+    "tool": "Tool",
+    "trigger": "Trigger",
+    "system": "System"
+  },
+  "header": {
+    "profile": "Profile",
+    "logout": "Logout"
+  },
+  "home": {
+    "welcome": "Welcome back, {name}",
+    "subtitle": "React admin console skeleton. Business domains will be migrated incrementally.",
+    "statApplication": "Applications",
+    "statKnowledge": "Knowledge bases",
+    "statDocument": "Documents",
+    "statConversation": "Conversations",
+    "quick": "Quick access"
+  },
+  "common": {
+    "loading": "Loading...",
+    "add": "Add",
+    "create": "Create",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "setting": "Settings",
+    "moveTo": "Move to",
+    "confirm": "Confirm",
+    "name": "Name",
+    "desc": "Description",
+    "searchBar": {
+      "placeholder": "Search"
+    },
+    "createdIn": "Created in",
+    "character": "characters",
+    "noData": "No data",
+    "selected": "Selected",
+    "importCreate": "Import",
+    "export": "Export",
+    "exportSuccess": "Exported",
+    "submitSuccess": "Submitted",
+    "deleteSuccess": "Deleted",
+    "createSuccess": "Created",
+    "saveSuccess": "Saved",
+    "importSuccess": "Imported",
+    "authorization": "Authorization",
+    "modify": "Modify",
+    "requiredMessage": "Required",
+    "operation": "Operation",
+    "required": "Required"
+  },
+  "components": {
+    "folder": {
+      "addFolder": "New Folder",
+      "folderNamePlaceholder": "Please enter folder name",
+      "requiredMessage": "Please select a folder"
+    }
+  },
+  "views": {
+    "model": {
+      "provider": "Provider",
+      "addModel": "Add Model",
+      "providerPlaceholder": "Select Provider",
+      "modelType": {
+        "allModel": "All Models",
+        "publicModel": "Public Models",
+        "privateModel": "Local Models",
+        "EMBEDDING": "Embedding",
+        "LLM": "LLM",
+        "STT": "Speech to Text",
+        "TTS": "Text to Speech",
+        "IMAGE": "Image Understanding",
+        "TTI": "Text to Image",
+        "RERANKER": "Reranker",
+        "TTV": "Text to Video",
+        "ITV": "Image to Video"
+      },
+      "modelForm": {
+        "modeName": {
+          "label": "Model Name",
+          "requiredMessage": "Please enter model name"
+        },
+        "model_type": {
+          "label": "Model Type",
+          "placeholder": "Please select model type",
+          "requiredMessage": "Please select model type"
+        },
+        "base_model": {
+          "label": "Base Model",
+          "placeholder": "Please select base model",
+          "requiredMessage": "Please select base model"
+        },
+        "title": {
+          "baseInfo": "Base Info",
+          "advancedInfo": "Advanced Info",
+          "modelParams": "Model Params",
+          "paramSetting": "Param Setting"
+        }
+      },
+      "tip": {
+        "createSuccessMessage": "Created",
+        "createErrorMessage": "Form is invalid, please check",
+        "emptyMessage1": "Please select model type and base model first",
+        "emptyMessage2": "Reranker does not support custom params",
+        "noModel": "Model not found"
+      },
+      "download": {
+        "cancelDownload": "Cancel Download",
+        "downloading": "Downloading"
+      },
+      "delete": {
+        "confirmTitle": "Confirm delete model ",
+        "resourceCountMessage": "This model is used by {count} resources, deletion will break them"
+      }
+    },
+    "knowledge": {
+      "document_count": "Documents",
+      "knowledgeType": {
+        "createGeneralKnowledge": "Create General Knowledge",
+        "generalKnowledge": "General",
+        "generalInfo": "Upload documents and Q&A, supports many formats",
+        "createWebKnowledge": "Create Web Knowledge",
+        "webKnowledge": "Web",
+        "webInfo": "Crawl web pages by URL",
+        "createLarkKnowledge": "Create Lark Knowledge",
+        "larkKnowledge": "Lark",
+        "larkInfo": "Sync Lark documents",
+        "createWorkflowKnowledge": "Create Workflow Knowledge",
+        "workflowKnowledge": "Workflow",
+        "workflowInfo": "Generate content via workflow nodes"
+      },
+      "form": {
+        "knowledgeName": {
+          "label": "Knowledge Name",
+          "requiredMessage": "Please enter knowledge name"
+        },
+        "knowledgeDescription": {
+          "label": "Knowledge Description",
+          "requiredMessage": "Please enter knowledge description"
+        },
+        "EmbeddingModel": {
+          "label": "Embedding Model",
+          "requiredMessage": "Please select embedding model",
+          "placeholder": "Please select embedding model"
+        },
+        "source_url": {
+          "label": "Source URL",
+          "requiredMessage": "Please enter source URL",
+          "placeholder": "Please enter site URL"
+        },
+        "selector": {
+          "label": "Selector",
+          "placeholder": "CSS selector (optional)"
+        }
+      },
+      "setting": {
+        "sync": "Sync",
+        "vectorization": "Vectorize",
+        "syncReplace": "Replace Sync",
+        "syncComplete": "Complete Sync"
+      },
+      "delete": {
+        "confirmTitle": "Confirm delete knowledge ",
+        "resourceCountMessage": "This knowledge is used by {count} resources",
+        "confirmTitle2": "knowledge bases",
+        "confirmBatch": "Confirm delete {count} knowledge bases?"
+      },
+      "export": {
+        "withSource": "With source files",
+        "withoutSource": "Without source files"
+      }
+    },
+    "shared": {
+      "title": "Shared",
+      "authorized_workspace": "Authorize Workspace"
+    },
+    "system": {
+      "resourceAuthorization": {
+        "title": "Resource Authorization"
+      },
+      "resourceMapping": {
+        "title": "Resource Mapping"
+      }
+    },
+    "document": {
+      "generateQuestion": {
+        "title": "Generate Related Questions",
+        "count": "Count"
+      },
+      "setting": {
+        "exportDocument": "Export",
+        "exportKnowledge": "Export Knowledge"
+      },
+      "delete": {
+        "successMessage": "Deleted"
+      }
+    },
+    "paragraph": {
+      "setting": {
+        "cancelSelected": "Cancel Selection",
+        "batchSelected": "Batch Select"
+      },
+      "delete": {
+        "confirmMessage": "Deletion cannot be undone, confirm?"
+      }
+    }
+  },
+  "dynamicsForm": {
+    "default": {
+      "label": "Default"
+    },
+    "paramForm": {
+      "title": "Add Param",
+      "name": {
+        "label": "Name"
+      },
+      "field": {
+        "label": "Field"
+      },
+      "input_type": {
+        "label": "Input Type"
+      },
+      "default": {
+        "label": "Default"
+      }
+    }
+  }
+}

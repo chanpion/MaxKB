@@ -1,0 +1,244 @@
+{
+  "login": {
+    "title": "登录 MaxKB",
+    "desc": "企业级智能体平台",
+    "username": "用户名 / 邮箱",
+    "password": "密码",
+    "submit": "登 录",
+    "success": "登录成功",
+    "usernameRequired": "请输入用户名",
+    "passwordRequired": "请输入密码"
+  },
+  "menu": {
+    "home": "工作台",
+    "knowledge": "知识库",
+    "model": "模型管理",
+    "application": "应用管理",
+    "tool": "工具",
+    "trigger": "触发器",
+    "system": "系统管理"
+  },
+  "header": {
+    "profile": "个人中心",
+    "logout": "退出登录"
+  },
+  "home": {
+    "welcome": "欢迎回来，{name}",
+    "subtitle": "这是 React 版本管理控制台的骨架首页，后续业务域将按此结构逐步移植。",
+    "statApplication": "应用数",
+    "statKnowledge": "知识库数",
+    "statDocument": "文档数",
+    "statConversation": "对话数",
+    "quick": "快捷入口"
+  },
+  "common": {
+    "loading": "加载中...",
+    "add": "添加",
+    "create": "创建",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "setting": "设置",
+    "moveTo": "移动到",
+    "confirm": "确定",
+    "name": "名称",
+    "desc": "描述",
+    "searchBar": {
+      "placeholder": "搜索"
+    },
+    "createdIn": "创建于",
+    "character": "字符",
+    "noData": "暂无数据",
+    "selected": "已选",
+    "importCreate": "导入创建",
+    "export": "导出",
+    "exportSuccess": "导出成功",
+    "submitSuccess": "提交成功",
+    "deleteSuccess": "删除成功",
+    "createSuccess": "创建成功",
+    "saveSuccess": "保存成功",
+    "importSuccess": "导入成功",
+    "authorization": "授权",
+    "modify": "修改",
+    "requiredMessage": "必填",
+    "operation": "操作",
+    "required": "必填"
+  },
+  "components": {
+    "folder": {
+      "addFolder": "新建文件夹",
+      "folderNamePlaceholder": "请输入文件夹名称",
+      "requiredMessage": "请选择文件夹"
+    }
+  },
+  "views": {
+    "model": {
+      "provider": "供应商",
+      "addModel": "添加模型",
+      "providerPlaceholder": "选择供应商",
+      "modelType": {
+        "allModel": "全部模型",
+        "publicModel": "公共模型",
+        "privateModel": "本地模型",
+        "EMBEDDING": "嵌入模型",
+        "LLM": "大语言模型",
+        "STT": "语音识别",
+        "TTS": "语音合成",
+        "IMAGE": "图像理解",
+        "TTI": "图像生成",
+        "RERANKER": "重排模型",
+        "TTV": "文本转视频",
+        "ITV": "图像转视频"
+      },
+      "modelForm": {
+        "modeName": {
+          "label": "模型名称",
+          "requiredMessage": "请输入模型名称"
+        },
+        "model_type": {
+          "label": "模型类型",
+          "placeholder": "请选择模型类型",
+          "requiredMessage": "请选择模型类型"
+        },
+        "base_model": {
+          "label": "基础模型",
+          "placeholder": "请选择基础模型",
+          "requiredMessage": "请选择基础模型"
+        },
+        "title": {
+          "baseInfo": "基础信息",
+          "advancedInfo": "高级信息",
+          "modelParams": "模型参数",
+          "paramSetting": "参数设置"
+        }
+      },
+      "tip": {
+        "createSuccessMessage": "创建成功",
+        "createErrorMessage": "表单填写有误，请检查",
+        "emptyMessage1": "请先选择模型类型与基础模型",
+        "emptyMessage2": "重排模型暂不支持自定义参数",
+        "noModel": "模型不存在"
+      },
+      "download": {
+        "cancelDownload": "取消下载",
+        "downloading": "下载中"
+      },
+      "delete": {
+        "confirmTitle": "确认删除模型 ",
+        "resourceCountMessage": "该模型已被 {count} 个资源使用，删除后相关资源将不可用"
+      }
+    },
+    "knowledge": {
+      "document_count": "文档数",
+      "knowledgeType": {
+        "createGeneralKnowledge": "创建通用知识库",
+        "generalKnowledge": "通用型",
+        "generalInfo": "上传文档、问答对，支持多种格式",
+        "createWebKnowledge": "创建 Web 站点知识库",
+        "webKnowledge": "Web 站点",
+        "webInfo": "通过 URL 爬取网页内容",
+        "createLarkKnowledge": "创建飞书知识库",
+        "larkKnowledge": "飞书",
+        "larkInfo": "同步飞书文档",
+        "createWorkflowKnowledge": "创建工作流知识库",
+        "workflowKnowledge": "工作流",
+        "workflowInfo": "通过工作流节点生成内容"
+      },
+      "form": {
+        "knowledgeName": {
+          "label": "知识库名称",
+          "requiredMessage": "请输入知识库名称"
+        },
+        "knowledgeDescription": {
+          "label": "知识库描述",
+          "requiredMessage": "请输入知识库描述"
+        },
+        "EmbeddingModel": {
+          "label": "向量模型",
+          "requiredMessage": "请选择向量模型",
+          "placeholder": "请选择向量模型"
+        },
+        "source_url": {
+          "label": "数据源 URL",
+          "requiredMessage": "请输入数据源 URL",
+          "placeholder": "请输入站点地址"
+        },
+        "selector": {
+          "label": "选择器",
+          "placeholder": "CSS 选择器（可选）"
+        }
+      },
+      "setting": {
+        "sync": "同步",
+        "vectorization": "向量化",
+        "syncReplace": "替换同步",
+        "syncComplete": "完整同步"
+      },
+      "delete": {
+        "confirmTitle": "确认删除知识库 ",
+        "resourceCountMessage": "该知识库已被 {count} 个资源使用",
+        "confirmTitle2": "个知识库",
+        "confirmBatch": "确认删除 {count} 个知识库？"
+      },
+      "export": {
+        "withSource": "包含源文件",
+        "withoutSource": "不包含源文件"
+      }
+    },
+    "shared": {
+      "title": "共享",
+      "authorized_workspace": "授权工作空间"
+    },
+    "system": {
+      "resourceAuthorization": {
+        "title": "资源授权"
+      },
+      "resourceMapping": {
+        "title": "资源映射"
+      }
+    },
+    "document": {
+      "generateQuestion": {
+        "title": "生成关联问题",
+        "count": "生成数量"
+      },
+      "setting": {
+        "exportDocument": "导出",
+        "exportKnowledge": "导出知识库"
+      },
+      "delete": {
+        "successMessage": "删除成功"
+      }
+    },
+    "paragraph": {
+      "setting": {
+        "cancelSelected": "取消选择",
+        "batchSelected": "批量选择"
+      },
+      "delete": {
+        "confirmMessage": "删除后不可恢复，确认删除？"
+      }
+    }
+  },
+  "dynamicsForm": {
+    "default": {
+      "label": "默认值"
+    },
+    "paramForm": {
+      "title": "添加参数",
+      "name": {
+        "label": "名称"
+      },
+      "field": {
+        "label": "字段"
+      },
+      "input_type": {
+        "label": "输入类型"
+      },
+      "default": {
+        "label": "默认值"
+      }
+    }
+  }
+}

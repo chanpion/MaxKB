@@ -1,16 +1,17 @@
-# coding=utf-8
 """application app tables (agents, chats, long-term memory, access tokens).
 
 FK columns are plain ids (legacy db_constraint=False -> no DB FKs). MPTT folder
 columns retained for compatibility. JSON/JSONB fields rely on SQLModel's
 implicit JSONB mapping for PostgreSQL.
 """
+
 from datetime import datetime
 from uuid import UUID
 
 import uuid_utils.compat as uuid
 from sqlalchemy import Column
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlmodel import Field
 
 from app.models.base import AppTableBase
@@ -42,14 +43,14 @@ class Application(AppTableBase, table=True):
     dialogue_number: int = Field(default=0)
     user_id: UUID | None = Field(default=None)
     model_id: UUID | None = Field(default=None)
-    knowledge_setting: dict = Field(default={})
-    model_setting: dict = Field(default={})
-    model_params_setting: dict = Field(default={})
-    tts_model_params_setting: dict = Field(default={})
-    stt_model_params_setting: dict = Field(default={})
+    knowledge_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    model_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    tts_model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    stt_model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
     problem_optimization: bool = Field(default=False)
     icon: str = Field(default="./favicon.ico", max_length=256)
-    work_flow: dict = Field(default={})
+    work_flow: dict = Field(default={}, sa_column=Column(JSONB))
     type: str = Field(default="SIMPLE", max_length=256)
     problem_optimization_prompt: str | None = Field(default=None, max_length=102400)
     tts_model_id: UUID | None = Field(default=None)
@@ -62,23 +63,23 @@ class Application(AppTableBase, table=True):
     clean_time: int = Field(default=180)
     publish_time: datetime | None = Field(default=None)
     file_upload_enable: bool = Field(default=False)
-    file_upload_setting: dict = Field(default={})
+    file_upload_setting: dict = Field(default={}, sa_column=Column(JSONB))
     mcp_enable: bool = Field(default=False)
-    mcp_tool_ids: list = Field(default=[])
-    mcp_servers: dict = Field(default={})
+    mcp_tool_ids: list = Field(default=[], sa_column=Column(JSONB))
+    mcp_servers: dict = Field(default={}, sa_column=Column(JSONB))
     mcp_source: str = Field(default="referencing", max_length=20)
     tool_enable: bool = Field(default=False)
-    tool_ids: list = Field(default=[])
+    tool_ids: list = Field(default=[], sa_column=Column(JSONB))
     application_enable: bool = Field(default=False)
-    application_ids: list = Field(default=[])
-    skill_tool_ids: list = Field(default=[])
+    application_ids: list = Field(default=[], sa_column=Column(JSONB))
+    skill_tool_ids: list = Field(default=[], sa_column=Column(JSONB))
     mcp_output_enable: bool = Field(default=True)
     file_clean_time: int = Field(default=180)
     long_term_enable: bool = Field(default=False)
     long_term_model_id: UUID | None = Field(default=None)
-    long_term_model_params_setting: dict = Field(default={})
+    long_term_model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
     long_term_trigger_type: str = Field(default="ROUND")
-    long_term_trigger_setting: dict = Field(default={})
+    long_term_trigger_setting: dict = Field(default={}, sa_column=Column(JSONB))
 
 
 class ApplicationKnowledgeMapping(AppTableBase, table=True):
@@ -94,18 +95,20 @@ class ApplicationVersion(AppTableBase, table=True):
     application_id: UUID
     name: str = Field(default="", max_length=128)
     desc: str = Field(default="", max_length=512)
+    publish_user_id: UUID | None = Field(default=None)
+    publish_user_name: str = Field(default="", max_length=128)
     prologue: str = Field(default="", max_length=40960)
     dialogue_number: int = Field(default=0)
     user_id: UUID | None = Field(default=None)
     model_id: UUID | None = Field(default=None)
-    knowledge_setting: dict = Field(default={})
-    model_setting: dict = Field(default={})
-    model_params_setting: dict = Field(default={})
-    tts_model_params_setting: dict = Field(default={})
-    stt_model_params_setting: dict = Field(default={})
+    knowledge_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    model_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    tts_model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
+    stt_model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
     problem_optimization: bool = Field(default=False)
     icon: str = Field(default="./favicon.ico", max_length=256)
-    work_flow: dict = Field(default={})
+    work_flow: dict = Field(default={}, sa_column=Column(JSONB))
     type: str = Field(default="SIMPLE", max_length=256)
     problem_optimization_prompt: str | None = Field(default=None, max_length=102400)
     tts_model_id: UUID | None = Field(default=None)
@@ -117,22 +120,22 @@ class ApplicationVersion(AppTableBase, table=True):
     stt_autosend: bool = Field(default=False)
     clean_time: int = Field(default=180)
     file_upload_enable: bool = Field(default=False)
-    file_upload_setting: dict = Field(default={})
+    file_upload_setting: dict = Field(default={}, sa_column=Column(JSONB))
     mcp_enable: bool = Field(default=False)
-    mcp_tool_ids: list = Field(default=[])
-    mcp_servers: dict = Field(default={})
+    mcp_tool_ids: list = Field(default=[], sa_column=Column(JSONB))
+    mcp_servers: dict = Field(default={}, sa_column=Column(JSONB))
     mcp_source: str = Field(default="referencing", max_length=20)
     tool_enable: bool = Field(default=False)
-    tool_ids: list = Field(default=[])
+    tool_ids: list = Field(default=[], sa_column=Column(JSONB))
     application_enable: bool = Field(default=False)
-    application_ids: list = Field(default=[])
-    skill_tool_ids: list = Field(default=[])
+    application_ids: list = Field(default=[], sa_column=Column(JSONB))
+    skill_tool_ids: list = Field(default=[], sa_column=Column(JSONB))
     mcp_output_enable: bool = Field(default=True)
     long_term_enable: bool = Field(default=False)
     long_term_model_id: UUID | None = Field(default=None)
-    long_term_model_params_setting: dict = Field(default={})
+    long_term_model_params_setting: dict = Field(default={}, sa_column=Column(JSONB))
     long_term_trigger_type: str = Field(default="ROUND")
-    long_term_trigger_setting: dict = Field(default={})
+    long_term_trigger_setting: dict = Field(default={}, sa_column=Column(JSONB))
 
 
 class Chat(AppTableBase, table=True):
@@ -143,13 +146,13 @@ class Chat(AppTableBase, table=True):
     chat_user_id: str | None = Field(default=None)
     chat_user_type: str = Field(default="ANONYMOUS_USER", max_length=64)
     is_deleted: bool = Field(default=False)
-    asker: dict = Field(default={"username": "游客"})
-    meta: dict = Field(default={})
+    asker: dict = Field(default={"username": "游客"}, sa_column=Column(JSONB))
+    meta: dict = Field(default={}, sa_column=Column(JSONB))
     star_num: int = Field(default=0)
     trample_num: int = Field(default=0)
     chat_record_count: int = Field(default=0)
     mark_sum: int = Field(default=0)
-    source: dict = Field(default={})
+    source: dict = Field(default={}, sa_column=Column(JSONB))
     ip_address: str = Field(default="", max_length=128)
 
 
@@ -166,11 +169,11 @@ class ChatRecord(AppTableBase, table=True):
     message_tokens: int = Field(default=0)
     answer_tokens: int = Field(default=0)
     const: int = Field(default=0)
-    details: dict = Field(default={})
+    details: dict = Field(default={}, sa_column=Column(JSONB))
     improve_paragraph_id_list: list = Field(default=[], sa_column=Column(ARRAY(PG_UUID)))
     run_time: float = Field(default=0.0)
     index: int
-    source: dict = Field(default={})
+    source: dict = Field(default={}, sa_column=Column(JSONB))
     ip_address: str = Field(default="", max_length=128)
 
 
@@ -213,7 +216,7 @@ class ApplicationAccessToken(AppTableBase, table=True):
     show_source: bool = Field(default=False)
     show_exec: bool = Field(default=False)
     authentication: bool = Field(default=False)
-    authentication_value: dict = Field(default={})
+    authentication_value: dict = Field(default={}, sa_column=Column(JSONB))
     language: str | None = Field(default=None, max_length=10)
 
 

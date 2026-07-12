@@ -1,5 +1,5 @@
-# coding=utf-8
 """trigger app tables."""
+
 from uuid import UUID
 
 import uuid_utils.compat as uuid
@@ -30,7 +30,7 @@ class TriggerTask(AppTableBase, table=True):
     source_type: str = Field(default="APPLICATION", max_length=256)
     source_id: UUID
     is_active: bool = Field(default=True, index=True)
-    parameter: list = Field(default=[])
+    parameter: list = Field(default=[], sa_column=Column(JSONB))
     meta: dict = Field(default={}, sa_column=Column(JSONB))
 
 

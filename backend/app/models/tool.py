@@ -1,13 +1,13 @@
-# coding=utf-8
 """tools app tables. FK columns are stored as plain id columns (the legacy
 Django models used db_constraint=False, so there is NO DB-level foreign key)."""
+
 from datetime import datetime
 from uuid import UUID
 
 import uuid_utils.compat as uuid
 from sqlalchemy import Column
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlmodel import Field, String
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Field
 
 from app.models.base import AppTableBase
 

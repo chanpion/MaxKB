@@ -1,10 +1,10 @@
-# coding=utf-8
 """system_manage app tables + shared `system_setting` (also used by local_model)."""
+
 from uuid import UUID
 
 import uuid_utils.compat as uuid
 from sqlalchemy import Column
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, STRING
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, String
 
 from app.models.base import AppTableBase

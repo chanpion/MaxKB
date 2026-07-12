@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     )
     admin_path: str = Field(default="/admin", alias="MAXKB_ADMIN_PATH")
     chat_path: str = Field(default="/chat", alias="MAXKB_CHAT_PATH")
+    api_prefix: str = Field(default="/api", alias="MAXKB_API_PREFIX")
+    chat_api_prefix: str = Field(default="/api", alias="MAXKB_CHAT_API_PREFIX")
     session_timeout: int = Field(default=28800, alias="MAXKB_SESSION_TIMEOUT")
     external_locale_path: str = Field(default="/opt/maxkb/local/locales", alias="MAXKB_EXTERNAL_LOCALE_PATH")
 

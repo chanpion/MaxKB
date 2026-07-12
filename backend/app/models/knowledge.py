@@ -1,16 +1,16 @@
-# coding=utf-8
 """knowledge app tables (RAG).
 
 FK columns are stored as plain ids (legacy models used db_constraint=False ->
 no DB-level foreign keys). `embedding` uses pgvector; MPTT folder columns are
 retained for schema compatibility and queried via parent_id + PG WITH RECURSIVE.
 """
+
 from datetime import datetime
 from uuid import UUID
 
 import uuid_utils.compat as uuid
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Column, Float, Integer, String
+from sqlalchemy import Column, String
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlmodel import Field
 

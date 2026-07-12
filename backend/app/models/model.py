@@ -1,9 +1,9 @@
-# coding=utf-8
 """Model table (db_table='model').
 
 NOTE: both `models_provider` and `local_model` define a `Model` pointing to the
 same `model` table. Defined ONCE here. Stores provider model credentials.
 """
+
 from uuid import UUID
 
 import uuid_utils.compat as uuid

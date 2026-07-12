@@ -1,12 +1,10 @@
-"""Application (agent) API + chat streaming endpoint.
-
-The Agno ``ChatAgent`` is imported lazily inside the chat endpoint so the rest
-of the app imports cleanly even before ``agno`` is installed in the venv.
-"""
+"""Application (agent) API — CRUD, publish, chat streaming endpoint."""
 
 from __future__ import annotations
 
 import json
+import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -15,12 +13,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.security import get_current_user
-from app.models.application import Application, ApplicationKnowledgeMapping
+from app.models.application import (
+    Application,
+    ApplicationAccessToken,
+    ApplicationApiKey,
+    ApplicationFolder,
+    ApplicationKnowledgeMapping,
+    ApplicationVersion,
+    Chat,
+)
 from app.models.models_provider import Model
 from app.models.user import User
-from app.schemas.application import ApplicationOut, ApplicationPage, ChatRequest
+from app.schemas.application import (
+    AccessTokenOut,
+    AccessTokenUpdate,
+    ApiKeyCreate,
+    ApiKeyOut,
+    ApplicationCreate,
+    ApplicationOut,
+    ApplicationPage,
+    ApplicationStatsOut,
+    ApplicationUpdate,
+    ApplicationVersionOut,
+    ChatRequest,
+)
 
 router = APIRouter(prefix="/api/application", tags=["application"])
+
+
+# ---------------------------------------------------------------------------
+# Read
+# ---------------------------------------------------------------------------
 
 
 @router.get("", response_model=ApplicationPage)
@@ -38,6 +61,43 @@ async def list_applications(
     return ApplicationPage(list=[ApplicationOut.model_validate(a) for a in rows], total=total or 0)
 
 
+# ---------------------------------------------------------------------------
+# Application Folders (MUST come before /{application_id})
+# ---------------------------------------------------------------------------
+
+
+@router.get("/folder", response_model=list[dict])
+async def list_application_folders(
+    workspace_id: str = "default",
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    result = await session.execute(
+        select(ApplicationFolder).where(ApplicationFolder.workspace_id == workspace_id).order_by(ApplicationFolder.lft)
+    )
+    rows = result.scalars().all()
+    return [{"id": f.id, "name": f.name, "desc": f.desc, "parent_id": f.parent_id} for f in rows]
+
+
+@router.post("/folder", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def create_application_folder(
+    body: dict,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    folder = ApplicationFolder(
+        name=body.get("name", ""),
+        desc=body.get("desc"),
+        parent_id=body.get("parent_id"),
+        workspace_id=body.get("workspace_id", "default"),
+        user_id=current_user.id,
+    )
+    session.add(folder)
+    await session.commit()
+    await session.refresh(folder)
+    return {"id": folder.id, "name": folder.name, "desc": folder.desc, "parent_id": folder.parent_id}
+
+
 @router.get("/{application_id}", response_model=ApplicationOut)
 async def get_application(
     application_id: str,
@@ -48,6 +108,370 @@ async def get_application(
     if application is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
     return ApplicationOut.model_validate(application)
+
+
+# ---------------------------------------------------------------------------
+# Create
+# ---------------------------------------------------------------------------
+
+
+@router.post("", response_model=ApplicationOut, status_code=status.HTTP_201_CREATED)
+async def create_application(
+    body: ApplicationCreate,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> ApplicationOut:
+    data = body.model_dump()
+    knowledge_ids: list = data.pop("knowledge_id_list", []) or []
+
+    application = Application(
+        **data,
+        user_id=current_user.id,
+        workspace_id="default",
+    )
+    session.add(application)
+    await session.flush()
+
+    # Link knowledge bases (SIMPLE type)
+    for kid in knowledge_ids:
+        session.add(ApplicationKnowledgeMapping(application_id=application.id, knowledge_id=kid))
+
+    await session.commit()
+    await session.refresh(application)
+    return ApplicationOut.model_validate(application)
+
+
+# ---------------------------------------------------------------------------
+# Update
+# ---------------------------------------------------------------------------
+
+
+@router.put("/{application_id}", response_model=ApplicationOut)
+async def update_application(
+    application_id: str,
+    body: ApplicationUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> ApplicationOut:
+    application = await session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    update_data = body.model_dump(exclude_unset=True)
+    knowledge_ids: list | None = update_data.pop("knowledge_id_list", None)
+
+    for field, value in update_data.items():
+        setattr(application, field, value)
+
+    # Re-sync knowledge base mappings if provided
+    if knowledge_ids is not None:
+        existing = await session.execute(
+            select(ApplicationKnowledgeMapping).where(ApplicationKnowledgeMapping.application_id == application.id)
+        )
+        for m in existing.scalars().all():
+            await session.delete(m)
+        for kid in knowledge_ids:
+            session.add(ApplicationKnowledgeMapping(application_id=application.id, knowledge_id=kid))
+
+    await session.commit()
+    await session.refresh(application)
+    return ApplicationOut.model_validate(application)
+
+
+# ---------------------------------------------------------------------------
+# Delete
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_application(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> None:
+    application = await session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+    await session.delete(application)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Publish
+# ---------------------------------------------------------------------------
+
+
+@router.put("/{application_id}/publish", response_model=ApplicationOut)
+async def publish_application(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> ApplicationOut:
+    application = await session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    now = datetime.now()
+    application.is_publish = True
+    application.publish_time = now
+
+    # Create a version snapshot
+    version_name = now.strftime("%Y-%m-%d %H:%M:%S")
+    version = ApplicationVersion(
+        application_id=application.id,
+        name=version_name,
+        publish_user_id=current_user.id,
+        publish_user_name=current_user.username,
+        desc=application.desc,
+        prologue=application.prologue,
+        dialogue_number=application.dialogue_number,
+        model_id=application.model_id,
+        knowledge_setting=application.knowledge_setting,
+        model_setting=application.model_setting,
+        model_params_setting=application.model_params_setting,
+        problem_optimization=application.problem_optimization,
+        icon=application.icon,
+        work_flow=application.work_flow,
+        type=application.type,
+        problem_optimization_prompt=application.problem_optimization_prompt,
+        tts_model_id=application.tts_model_id,
+        stt_model_id=application.stt_model_id,
+        tts_model_enable=application.tts_model_enable,
+        stt_model_enable=application.stt_model_enable,
+        tts_type=application.tts_type,
+        tts_autoplay=application.tts_autoplay,
+        stt_autosend=application.stt_autosend,
+        clean_time=application.clean_time,
+        file_upload_enable=application.file_upload_enable,
+        file_upload_setting=application.file_upload_setting,
+        mcp_enable=application.mcp_enable,
+        mcp_tool_ids=application.mcp_tool_ids,
+        mcp_servers=application.mcp_servers,
+        tool_enable=application.tool_enable,
+        tool_ids=application.tool_ids,
+        application_enable=application.application_enable,
+        application_ids=application.application_ids,
+        skill_tool_ids=application.skill_tool_ids,
+        long_term_enable=application.long_term_enable,
+        long_term_model_id=application.long_term_model_id,
+        long_term_model_params_setting=application.long_term_model_params_setting,
+        long_term_trigger_type=application.long_term_trigger_type,
+        long_term_trigger_setting=application.long_term_trigger_setting,
+    )
+    session.add(version)
+
+    # Ensure access token exists
+    token_result = await session.execute(
+        select(ApplicationAccessToken).where(ApplicationAccessToken.application_id == application.id)
+    )
+    if token_result.scalar_one_or_none() is None:
+        import hashlib
+
+        token_str = hashlib.md5(str(application.id).encode()).hexdigest()[8:24]
+        session.add(
+            ApplicationAccessToken(
+                application_id=application.id,
+                access_token=token_str,
+            )
+        )
+
+    await session.commit()
+    await session.refresh(application)
+    return ApplicationOut.model_validate(application)
+
+
+# ---------------------------------------------------------------------------
+# API Keys
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{application_id}/application_key", response_model=list[ApiKeyOut])
+async def list_api_keys(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[ApiKeyOut]:
+    result = await session.execute(select(ApplicationApiKey).where(ApplicationApiKey.application_id == application_id))
+    return [ApiKeyOut.model_validate(k) for k in result.scalars().all()]
+
+
+@router.post("/{application_id}/application_key", response_model=ApiKeyOut, status_code=status.HTTP_201_CREATED)
+async def create_api_key(
+    application_id: str,
+    body: ApiKeyCreate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> ApiKeyOut:
+    secret = "sk-" + secrets.token_hex(24)
+    key = ApplicationApiKey(
+        application_id=application_id,
+        secret_key=secret,
+        workspace_id="default",
+        is_active=body.is_active,
+        allow_cross_domain=body.allow_cross_domain,
+        cross_domain_list=body.cross_domain_list,
+        is_permanent=body.is_permanent,
+    )
+    session.add(key)
+    await session.commit()
+    await session.refresh(key)
+    return ApiKeyOut.model_validate(key)
+
+
+@router.delete("/{application_id}/application_key/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_api_key(
+    application_id: str,
+    key_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> None:
+    key = await session.get(ApplicationApiKey, key_id)
+    if key is None or str(key.application_id) != application_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+    await session.delete(key)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Access Token
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{application_id}/access_token", response_model=AccessTokenOut)
+async def get_access_token(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> AccessTokenOut:
+    result = await session.execute(
+        select(ApplicationAccessToken).where(ApplicationAccessToken.application_id == application_id)
+    )
+    token = result.scalar_one_or_none()
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access token not found")
+    return AccessTokenOut.model_validate(token)
+
+
+@router.put("/{application_id}/access_token", response_model=AccessTokenOut)
+async def update_access_token(
+    application_id: str,
+    body: AccessTokenUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> AccessTokenOut:
+    result = await session.execute(
+        select(ApplicationAccessToken).where(ApplicationAccessToken.application_id == application_id)
+    )
+    token = result.scalar_one_or_none()
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access token not found")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(token, field, value)
+
+    await session.commit()
+    await session.refresh(token)
+    return AccessTokenOut.model_validate(token)
+
+
+# ---------------------------------------------------------------------------
+# Application Versions
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{application_id}/application_version", response_model=list[ApplicationVersionOut])
+async def list_application_versions(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[ApplicationVersionOut]:
+    result = await session.execute(
+        select(ApplicationVersion)
+        .where(ApplicationVersion.application_id == application_id)
+        .order_by(ApplicationVersion.create_time.desc())
+    )
+    return [ApplicationVersionOut.model_validate(v) for v in result.scalars().all()]
+
+
+@router.get("/{application_id}/application_version/{version_id}", response_model=ApplicationVersionOut)
+async def get_application_version(
+    application_id: str,
+    version_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> ApplicationVersionOut:
+    version = await session.get(ApplicationVersion, version_id)
+    if version is None or str(version.application_id) != application_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+    return ApplicationVersionOut.model_validate(version)
+
+
+# ---------------------------------------------------------------------------
+# Application Stats
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{application_id}/stats", response_model=ApplicationStatsOut)
+async def application_stats(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> ApplicationStatsOut:
+    application = await session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    chat_count = (
+        await session.scalar(
+            select(func.count())
+            .select_from(Chat)
+            .where(
+                Chat.application_id == application_id,
+                Chat.is_deleted == False,  # noqa: E712
+            )
+        )
+        or 0
+    )
+
+    chat_user_count = (
+        await session.scalar(
+            select(func.count())
+            .select_from(Chat)
+            .where(
+                Chat.application_id == application_id,
+                Chat.is_deleted == False,  # noqa: E712
+            )
+        )
+        or 0
+    )
+
+    star_total = (
+        await session.scalar(
+            select(func.sum(Chat.star_num)).where(
+                Chat.application_id == application_id,
+                Chat.is_deleted == False,  # noqa: E712
+            )
+        )
+        or 0
+    )
+
+    trample_total = (
+        await session.scalar(
+            select(func.sum(Chat.trample_num)).where(
+                Chat.application_id == application_id,
+                Chat.is_deleted == False,  # noqa: E712
+            )
+        )
+        or 0
+    )
+
+    return ApplicationStatsOut(
+        dialogue_number=application.dialogue_number,
+        chat_count=chat_count,
+        chat_user_count=chat_user_count,
+        star_num=star_total,
+        trample_num=trample_total,
+    )
 
 
 def _embedding_dict(model: Model | None) -> dict | None:
@@ -90,7 +514,6 @@ async def chat(
 
     embedding = body.embedding or _embedding_dict(embedding_model_row)
 
-    # Lazy import so agno is only required when actually chatting.
     from app.agents.chat_agent import ChatAgent
 
     agent = ChatAgent(
@@ -108,7 +531,36 @@ async def chat(
         try:
             async for frame in agent.stream(body.message, session_id=body.session_id):
                 yield frame
-        except Exception as exc:  # surface errors as an SSE event
+        except Exception as exc:
             yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n\n"
 
     return StreamingResponse(event_source(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# Legacy path-based pagination — must be last to avoid shadowing sub-routes
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{page}/{page_size}", response_model=ApplicationPage)
+async def list_applications_paginated(
+    page: int,
+    page_size: int,
+    name: str = "",
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> ApplicationPage:
+    """Legacy path-based pagination: ``/{page}/{page_size}``."""
+    conditions = []
+    if name:
+        conditions.append(Application.name.ilike(f"%{name}%"))
+    total = await session.scalar(select(func.count()).select_from(Application).where(*conditions))
+    result = await session.execute(
+        select(Application)
+        .where(*conditions)
+        .order_by(Application.create_time.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = result.scalars().all()
+    return ApplicationPage(list=[ApplicationOut.model_validate(a) for a in rows], total=total or 0)

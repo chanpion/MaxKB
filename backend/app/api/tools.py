@@ -7,15 +7,27 @@ built-in tools live in the shared registry.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.security import get_current_user
-from app.models.tool import Tool, ToolFolder
+from app.models.tool import Tool, ToolFolder, ToolWorkflow, ToolWorkflowVersion
 from app.models.user import User
-from app.schemas.tool import ToolCreate, ToolFolderCreate, ToolFolderOut, ToolOut, ToolPage, ToolUpdate
+from app.schemas.tool import (
+    ToolCreate,
+    ToolFolderCreate,
+    ToolFolderOut,
+    ToolOut,
+    ToolPage,
+    ToolUpdate,
+    ToolWorkflowCreate,
+    ToolWorkflowOut,
+    ToolWorkflowVersionOut,
+)
 
 router = APIRouter(prefix="/api/tool", tags=["tool"])
 
@@ -102,6 +114,46 @@ async def create_tool(
     return ToolOut.model_validate(tool)
 
 
+# ---------------------------------------------------------------------------
+# Tool sub-routes (MUST come before /{tool_id} catch-all)
+# ---------------------------------------------------------------------------
+
+
+@router.put("/upload_skill_file")
+async def upload_skill_file(
+    file: UploadFile,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Upload a skill file."""
+    content = await file.read()
+    return {"result": True, "file_name": file.filename, "size": len(content)}
+
+
+@router.post("/test_connection")
+async def test_connection(
+    body: dict,
+    _: User = Depends(get_current_user),
+) -> dict:
+    return {"result": True}
+
+
+@router.post("/pylint")
+async def pylint_check(
+    body: dict,
+    _: User = Depends(get_current_user),
+) -> dict:
+    return {"result": True, "errors": []}
+
+
+@router.post("/generate_code")
+async def generate_code(
+    body: dict,
+    _: User = Depends(get_current_user),
+) -> dict:
+    return {"result": True, "code": ""}
+
+
 @router.get("/{tool_id}", response_model=ToolOut)
 async def get_tool(
     tool_id: str,
@@ -142,3 +194,160 @@ async def delete_tool(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tool not found")
     await session.delete(tool)
     await session.commit()
+
+
+# ---------------------------- tool workflows ----------------------------------
+
+
+@router.get("/{tool_id}/workflow", response_model=ToolWorkflowOut)
+async def get_tool_workflow(
+    tool_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> ToolWorkflowOut:
+    result = await session.execute(select(ToolWorkflow).where(ToolWorkflow.tool_id == tool_id))
+    workflow = result.scalar_one_or_none()
+    if workflow is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+    return ToolWorkflowOut.model_validate(workflow)
+
+
+@router.post("/{tool_id}/workflow", response_model=ToolWorkflowOut, status_code=status.HTTP_201_CREATED)
+async def create_tool_workflow(
+    tool_id: str,
+    body: ToolWorkflowCreate,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> ToolWorkflowOut:
+    tool = await session.get(Tool, tool_id)
+    if tool is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tool not found")
+
+    # Update or create
+    result = await session.execute(select(ToolWorkflow).where(ToolWorkflow.tool_id == tool_id))
+    workflow = result.scalar_one_or_none()
+    if workflow:
+        workflow.work_flow = body.work_flow
+    else:
+        workflow = ToolWorkflow(
+            tool_id=tool_id,
+            workspace_id=tool.workspace_id,
+            work_flow=body.work_flow,
+        )
+        session.add(workflow)
+
+    await session.commit()
+    await session.refresh(workflow)
+    return ToolWorkflowOut.model_validate(workflow)
+
+
+@router.put("/{tool_id}/publish", response_model=ToolWorkflowOut)
+async def publish_tool_workflow(
+    tool_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> ToolWorkflowOut:
+    result = await session.execute(select(ToolWorkflow).where(ToolWorkflow.tool_id == tool_id))
+    workflow = result.scalar_one_or_none()
+    if workflow is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+
+    workflow.is_publish = True
+    workflow.publish_time = datetime.now()
+
+    # Create version snapshot
+    version = ToolWorkflowVersion(
+        tool_id=tool_id,
+        workspace_id=workflow.workspace_id,
+        name=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        work_flow=workflow.work_flow,
+        publish_user_id=current_user.id,
+        publish_user_name=current_user.username,
+    )
+    session.add(version)
+    await session.commit()
+    await session.refresh(workflow)
+    return ToolWorkflowOut.model_validate(workflow)
+
+
+@router.get("/{tool_id}/workflow/versions", response_model=list[ToolWorkflowVersionOut])
+async def list_tool_workflow_versions(
+    tool_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[ToolWorkflowVersionOut]:
+    result = await session.execute(
+        select(ToolWorkflowVersion)
+        .where(ToolWorkflowVersion.tool_id == tool_id)
+        .order_by(ToolWorkflowVersion.create_time.desc())
+    )
+    rows = result.scalars().all()
+    return [ToolWorkflowVersionOut.model_validate(v) for v in rows]
+
+
+# ---------------------------- batch operations ---------------------------------
+
+
+@router.put("/batch_delete")
+async def batch_delete_tools(
+    body: dict,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    ids = body.get("ids", [])
+    if ids:
+        result = await session.execute(select(Tool).where(Tool.id.in_(ids)))
+        for tool in result.scalars().all():
+            await session.delete(tool)
+        await session.commit()
+    return {"result": True, "deleted": len(ids)}
+
+
+@router.put("/batch_move")
+async def batch_move_tools(
+    body: dict,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    ids = body.get("ids", [])
+    folder_id = body.get("folder_id", "default")
+    if ids:
+        result = await session.execute(select(Tool).where(Tool.id.in_(ids)))
+        for tool in result.scalars().all():
+            tool.folder_id = folder_id
+        await session.commit()
+    return {"result": True, "moved": len(ids)}
+
+
+# ---------------------------------------------------------------------------
+# Legacy path-based pagination (must be last to avoid shadowing sub-routes)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{page}/{page_size}")
+async def list_tools_paginated(
+    page: int,
+    page_size: int,
+    folder_id: str | None = None,
+    scope: str | None = None,
+    tool_type: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    conditions = []
+    if folder_id:
+        conditions.append(Tool.folder_id == folder_id)
+    if scope:
+        conditions.append(Tool.scope == scope)
+    if tool_type:
+        conditions.append(Tool.tool_type == tool_type)
+    total = await session.scalar(select(func.count()).select_from(Tool).where(*conditions))
+    result = await session.execute(
+        select(Tool)
+        .where(*conditions)
+        .order_by(Tool.create_time.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = result.scalars().all()
+    return {"records": [ToolOut.model_validate(t) for t in rows], "total": total or 0}

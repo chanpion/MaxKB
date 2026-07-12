@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlmodel import SQLModel
 
@@ -12,7 +13,7 @@ class ModelCreate(SQLModel):
     model_type: str
     model_name: str
     provider: str
-    credential: str = ""
+    credential: Any = ""
     status: str = "SUCCESS"
     workspace_id: str = "default"
     meta: dict = {}
@@ -42,6 +43,7 @@ class CredentialField(SQLModel):
 class ProviderInfo(SQLModel):
     provider: str
     name: str
+    icon: str = ""
     model_types: list[str] = []
     auth_type: str = "api_key"
     base_url: str = ""

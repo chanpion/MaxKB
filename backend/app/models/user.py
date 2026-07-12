@@ -1,9 +1,9 @@
-# coding=utf-8
 """User table (db_table='user').
 
 NOTE: both the `users` app and `local_model` app define a `User` model pointing
 to the same `user` table in the legacy DB. We define it ONCE here.
 """
+
 from uuid import UUID
 
 import uuid_utils.compat as uuid

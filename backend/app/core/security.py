@@ -23,9 +23,12 @@ _JWT_SECRET = hashlib.sha256(settings.db_password.encode()).digest()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/user/login", auto_error=False)
 
 
-def create_access_token(user_id: str, expires_minutes: int | None = None) -> str:
+def create_access_token(data: str | dict, expires_minutes: int | None = None) -> str:
     exp = datetime.now(UTC) + timedelta(minutes=expires_minutes or settings.session_timeout)
-    payload = {"sub": str(user_id), "exp": exp}
+    if isinstance(data, dict):
+        payload = {**data, "exp": exp}
+    else:
+        payload = {"sub": str(data), "exp": exp}
     return jwt.encode(payload, _JWT_SECRET, algorithm=ALGORITHM)
 
 

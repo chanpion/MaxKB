@@ -80,3 +80,31 @@ class ToolPage(SQLModel):
 
 
 ToolPage.model_rebuild()
+
+
+# --- Tool workflow ---
+
+
+class ToolWorkflowCreate(SQLModel):
+    work_flow: dict[str, Any]
+
+
+class ToolWorkflowOut(SQLModel):
+    id: uuid.UUID
+    tool_id: uuid.UUID
+    workspace_id: str = "default"
+    work_flow: dict[str, Any] | None = None
+    is_publish: bool = False
+    publish_time: datetime | None = None
+    create_time: datetime | None = None
+    update_time: datetime | None = None
+
+
+class ToolWorkflowVersionOut(SQLModel):
+    id: uuid.UUID
+    tool_id: uuid.UUID
+    name: str = ""
+    work_flow: dict[str, Any] | None = None
+    publish_user_id: uuid.UUID | None = None
+    publish_user_name: str = ""
+    create_time: datetime | None = None

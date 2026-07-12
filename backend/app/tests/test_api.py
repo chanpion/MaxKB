@@ -142,7 +142,7 @@ def test_list_knowledge(session):
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 1
-    assert body["list"][0]["name"] == "KB1"
+    assert body["records"][0]["name"] == "KB1"
 
 
 def test_create_knowledge(session):

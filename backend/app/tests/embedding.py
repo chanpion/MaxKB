@@ -2,11 +2,11 @@ import os
 
 from sentence_transformers import SentenceTransformer
 
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 # 加载模型（首次使用会自动下载，也可指定本地路径）
 # model = SentenceTransformer('all-MiniLM-L6-v2')
-model_path = '/Users/logenswolf/.cache/modelscope/models/BAAI--bge-m3/snapshots/master'
+model_path = "/Users/logenswolf/.cache/modelscope/models/BAAI--bge-m3/snapshots/master"
 model = SentenceTransformer(model_path)
 
 # 要向量化的文本

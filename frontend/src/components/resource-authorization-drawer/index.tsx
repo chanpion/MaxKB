@@ -41,7 +41,7 @@ const ResourceAuthorizationDrawer = forwardRef<ResourceAuthorizationDrawerRef, {
         open={open}
         onClose={() => setOpen(false)}
         width={480}
-        destroyOnClose
+        destroyOnHidden
         extra={
           <Button type="primary" onClick={save}>
             {t('common.save')}

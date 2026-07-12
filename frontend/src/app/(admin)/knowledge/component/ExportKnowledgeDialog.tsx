@@ -31,7 +31,7 @@ const ExportKnowledgeDialog = forwardRef<ExportKnowledgeDialogRef, {}>(function 
       title={t('views.document.setting.exportKnowledge')}
       open={open}
       onCancel={() => setOpen(false)}
-      destroyOnClose
+      destroyOnHidden
       footer={[
         <Button key="c" onClick={() => setOpen(false)}>
           {t('common.cancel')}

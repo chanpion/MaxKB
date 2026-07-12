@@ -42,7 +42,7 @@ const GenerateRelatedDialog = forwardRef<GenerateRelatedDialogRef, {}>(function 
       open={open}
       onClose={() => setOpen(false)}
       width={420}
-      destroyOnClose
+      destroyOnHidden
       footer={
         <Button type="primary" loading={loading} onClick={submit} block>
           {t('common.confirm')}

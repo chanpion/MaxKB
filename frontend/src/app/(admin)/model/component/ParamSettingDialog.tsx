@@ -43,7 +43,7 @@ const ParamSettingDialog = forwardRef<ParamSettingDialogRef, {}>(function ParamS
       open={open}
       onClose={() => setOpen(false)}
       width={520}
-      destroyOnClose
+      destroyOnHidden
       footer={
         <Button type="primary" loading={loading} onClick={save} block>
           {t('common.save')}

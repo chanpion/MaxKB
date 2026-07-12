@@ -16,22 +16,29 @@ const CreateFolderDialog = forwardRef<CreateFolderDialogRef, {onRefresh?: () => 
     const [form] = Form.useForm()
     const [source, setSource] = useState('')
     const [parentId, setParentId] = useState('')
+    const [editData, setEditData] = useState<any>(null)
     const t = useTranslations()
 
     useImperativeHandle(ref, () => ({
-      open: (src: string, parentId?: string) => {
+      open: (src: string, parentId?: string, data?: any) => {
         setSource(src)
         setParentId(parentId || '')
+        setEditData(data || null)
         setOpen(true)
         form.resetFields()
+        if (data) {
+          form.setFieldsValue({name: data.name, desc: data.desc || ''})
+        }
       },
     }))
 
     const submit = () => {
       form.validateFields().then((vals) => {
         setLoading(true)
-        folderApi
-          .postFolder(source, {...vals, parent_id: parentId || 'default'})
+        const apiCall = editData
+          ? folderApi.putFolder(editData.id, source, {...vals, parent_id: parentId || 'default'})
+          : folderApi.postFolder(source, {...vals, parent_id: parentId || 'default'})
+        apiCall
           .then(() => {
             return useUserStore.getState().profile()
           })
@@ -41,23 +48,25 @@ const CreateFolderDialog = forwardRef<CreateFolderDialogRef, {onRefresh?: () => 
             })
             setLoading(false)
             setOpen(false)
-            message.success(t('common.createSuccess'))
+            message.success(t(editData ? 'common.editSuccess' : 'common.createSuccess'))
             onRefresh?.()
           })
           .catch(() => setLoading(false))
       })
     }
 
+    const title = editData ? t('components.folder.editFolder') : t('components.folder.addFolder')
+
     return (
       <Modal
-        title={t('components.folder.addFolder')}
+        title={title}
         open={open}
         onCancel={() => setOpen(false)}
         onOk={submit}
         confirmLoading={loading}
         okText={t('common.add')}
         cancelText={t('common.cancel')}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Form.Item

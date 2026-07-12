@@ -92,7 +92,7 @@ export default function KnowledgeListContainer() {
   useEffect(() => {
     fetchPage(1, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder.currentFolder?.id])
+  }, [folder.currentFolder?.id, folder.refreshCounter])
 
   const onSearch = () => {
     setPagination((p) => ({...p, current_page: 1}))

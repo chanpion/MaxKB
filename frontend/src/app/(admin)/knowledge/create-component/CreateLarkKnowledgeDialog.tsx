@@ -54,7 +54,7 @@ const CreateLarkKnowledgeDialog = forwardRef<CreateLarkKnowledgeDialogRef, {onRe
         title={t('views.knowledge.knowledgeType.createLarkKnowledge')}
         open={open}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         footer={[
           <Button key="c" onClick={() => setOpen(false)}>
             {t('common.cancel')}

@@ -2,7 +2,8 @@
 import React, {useEffect, useState} from 'react'
 import {Breadcrumb, Card, Table, Button, Typography, Input, Space, message, Popconfirm, Tabs, Modal, Tag} from 'antd'
 import {HomeOutlined, FileTextOutlined, ExperimentOutlined, SettingOutlined, QuestionCircleOutlined, BookOutlined, PlusOutlined, DeleteOutlined, UserOutlined} from '@ant-design/icons'
-import {useParams, useRouter, usePathname} from '@/i18n/navigation'
+import {useParams} from 'next/navigation'
+import {useRouter, usePathname} from '@/i18n/navigation'
 import {termbaseApi} from '@/lib/api/knowledge/termbase'
 import {dateFormat} from '@/utils/time'
 

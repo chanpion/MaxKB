@@ -55,7 +55,7 @@ const AddParamDrawer = forwardRef<AddParamDrawerRef, {onRefresh: (data: any, ind
         open={open}
         onClose={() => setOpen(false)}
         width={420}
-        destroyOnClose
+        destroyOnHidden
         footer={
           <Button type="primary" onClick={submit} block>
             {t('common.save')}

@@ -22,6 +22,10 @@ const iconMap: Record<string, any> = {
   'app-all-menu-active': Icons.AppstoreOutlined,
   'app-batch-delete': Icons.DeleteOutlined,
   'app-template-center': Icons.AppstoreOutlined,
+  'app-folder-asc': Icons.ArrowUpOutlined,
+  'app-folder-desc': Icons.ArrowDownOutlined,
+  'app-folder-custom': Icons.MenuOutlined,
+  'app-add-folder': Icons.FolderAddOutlined,
 }
 
 export interface AppIconProps extends React.HTMLAttributes<HTMLSpanElement> {

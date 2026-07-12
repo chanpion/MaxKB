@@ -51,7 +51,7 @@ const CreateKnowledgeDialog = forwardRef<CreateKnowledgeDialogRef, {onRefresh?: 
         title={t('views.knowledge.knowledgeType.createGeneralKnowledge')}
         open={open}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         footer={[
           <Button key="c" onClick={() => setOpen(false)}>
             {t('common.cancel')}

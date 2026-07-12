@@ -54,7 +54,7 @@ const CreateWebKnowledgeDialog = forwardRef<CreateWebKnowledgeDialogRef, {onRefr
         title={t('views.knowledge.knowledgeType.createWebKnowledge')}
         open={open}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         footer={[
           <Button key="c" onClick={() => setOpen(false)}>
             {t('common.cancel')}

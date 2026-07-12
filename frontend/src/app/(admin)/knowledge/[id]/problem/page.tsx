@@ -2,7 +2,8 @@
 import React, {useEffect, useState} from 'react'
 import {Breadcrumb, Table, Button, Space, Typography, Tag, Spin, Modal, Form, Input, message, Popconfirm, Tabs} from 'antd'
 import {HomeOutlined, FileTextOutlined, QuestionCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined, ExperimentOutlined, BookOutlined, SettingOutlined, UserOutlined} from '@ant-design/icons'
-import {useParams, useRouter, usePathname} from '@/i18n/navigation'
+import {useParams} from 'next/navigation'
+import {useRouter, usePathname} from '@/i18n/navigation'
 import {get, post, del} from '@/lib/request'
 import {useUserStore} from '@/store'
 

@@ -2,7 +2,8 @@
 import React, {useEffect, useState} from 'react'
 import {Breadcrumb, Form, Input, Button, Card, Select, message, Spin, Typography} from 'antd'
 import {HomeOutlined, AppstoreOutlined, ArrowLeftOutlined, SaveOutlined, KeyOutlined, MessageOutlined} from '@ant-design/icons'
-import {useParams, useRouter, usePathname} from '@/i18n/navigation'
+import {useParams} from 'next/navigation'
+import {useRouter, usePathname} from '@/i18n/navigation'
 import {useTranslations} from 'next-intl'
 import {applicationApi} from '@/lib/api/application'
 

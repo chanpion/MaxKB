@@ -41,7 +41,7 @@ const SyncWebDialog = forwardRef<SyncWebDialogRef, {}>(function SyncWebDialog(_p
       title={t('views.knowledge.setting.sync')}
       open={open}
       onCancel={() => setOpen(false)}
-      destroyOnClose
+      destroyOnHidden
       footer={[
         <Button key="c" onClick={() => setOpen(false)}>
           {t('common.cancel')}

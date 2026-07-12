@@ -76,7 +76,7 @@ const EditModel = forwardRef<EditModelRef, {onChange?: () => void; apiType?: str
         open={open}
         width={600}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         title={t('common.edit')}
         footer={[
           <Button key="c" onClick={() => setOpen(false)}>

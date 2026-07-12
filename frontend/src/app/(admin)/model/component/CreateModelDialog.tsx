@@ -125,7 +125,7 @@ const CreateModelDialog = forwardRef<CreateModelDialogRef, {onChange?: () => voi
         open={open}
         width={600}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         title={
           <Breadcrumb
             items={[

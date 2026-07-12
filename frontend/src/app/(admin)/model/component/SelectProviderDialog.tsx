@@ -36,7 +36,7 @@ const SelectProviderDialog = forwardRef<SelectProviderDialogRef, {onChange: (p: 
         open={open}
         onCancel={() => setOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
         width={480}
       >
         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>

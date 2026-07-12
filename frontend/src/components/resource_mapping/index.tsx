@@ -26,7 +26,7 @@ const ResourceMappingDrawer = forwardRef<ResourceMappingDrawerRef, {}>(function 
       open={open}
       onClose={() => setOpen(false)}
       width={480}
-      destroyOnClose
+      destroyOnHidden
     >
       <Typography.Paragraph type="secondary">{resource?.name}</Typography.Paragraph>
       <Empty description={t('common.noData')} />

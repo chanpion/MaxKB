@@ -3,6 +3,7 @@ import React, {forwardRef, useImperativeHandle, useState} from 'react'
 import {Modal, message} from 'antd'
 import FolderVirtualizedTree from './FolderVirtualizedTree'
 import knowledgeApi from '@/lib/api/knowledge/knowledge'
+import folderApi from '@/lib/api/workspace/folder'
 import {SourceTypeEnum} from '@/enums/common'
 import {useTranslations} from 'next-intl'
 
@@ -17,12 +18,14 @@ const MoveToDialog = forwardRef<MoveToDialogRef, {onRefresh?: (row?: any) => voi
     const [selectFolderId, setSelectFolderId] = useState('')
     const [detail, setDetail] = useState<any>(null)
     const [isBatch, setIsBatch] = useState(false)
+    const [isFolder, setIsFolder] = useState(false)
     const t = useTranslations()
 
     useImperativeHandle(ref, () => ({
-      open: (data: any) => {
+      open: (data: any, folder?: boolean) => {
         setDetail(data)
         setIsBatch(!!data?.id_list)
+        setIsFolder(!!folder)
         setSelectFolderId('')
         setOpen(true)
       },
@@ -33,7 +36,6 @@ const MoveToDialog = forwardRef<MoveToDialogRef, {onRefresh?: (row?: any) => voi
         message.error(t('components.folder.requiredMessage'))
         return
       }
-      const obj = {...detail, folder_id: selectFolderId}
       setLoading(true)
       const finish = () => {
         setLoading(false)
@@ -41,6 +43,13 @@ const MoveToDialog = forwardRef<MoveToDialogRef, {onRefresh?: (row?: any) => voi
         message.success(t('common.saveSuccess'))
         onRefresh?.(detail)
       }
+
+      if (isFolder) {
+        const body = {...detail, parent_id: selectFolderId}
+        folderApi.putFolder(detail.id, detail.folder_type || source, body).then(finish).catch(() => setLoading(false))
+        return
+      }
+      const obj = {...detail, folder_id: selectFolderId}
       if (isBatch) {
         knowledgeApi.putMulMoveKnowledge(obj).then(finish).catch(() => setLoading(false))
       } else if (detail?.type === 2) {
@@ -59,8 +68,8 @@ const MoveToDialog = forwardRef<MoveToDialogRef, {onRefresh?: (row?: any) => voi
         confirmLoading={loading}
         okText={t('common.confirm')}
         cancelText={t('common.cancel')}
-        okButtonProps={{disabled: !selectFolderId}}
-        destroyOnClose
+        okButtonProps={{disabled: !selectFolderId || (isFolder && detail?.id === selectFolderId)}}
+        destroyOnHidden
       >
         <FolderVirtualizedTree source={source} onSelect={(node) => setSelectFolderId(node.id)} />
       </Modal>

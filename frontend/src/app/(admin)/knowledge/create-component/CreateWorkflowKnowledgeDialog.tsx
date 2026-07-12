@@ -50,7 +50,7 @@ const CreateWorkflowKnowledgeDialog = forwardRef<CreateWorkflowKnowledgeDialogRe
         title={t('views.knowledge.knowledgeType.createWorkflowKnowledge')}
         open={open}
         onCancel={() => setOpen(false)}
-        destroyOnClose
+        destroyOnHidden
         footer={[
           <Button key="c" onClick={() => setOpen(false)}>
             {t('common.cancel')}

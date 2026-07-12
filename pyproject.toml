@@ -33,9 +33,7 @@ dependencies = [
     "langchain-aws==1.6.0",
     "langgraph==1.2.6",
     "deepagents==0.6.11",
-    "torch==2.12.1",
     "numpy==1.26.4",
-    "sentence-transformers==5.0.0",
     "qianfan==0.4.12.3",
     "zai-sdk==0.2.3",
     "volcengine-python-sdk[ark]==5.0.24",
@@ -64,6 +62,12 @@ dependencies = [
     "markdownify==1.2.2",
     "polib==1.2.0",
     "cryptography==48.0.1"
+]
+
+[project.optional-dependencies]
+local_model = [
+    "torch==2.12.1",
+    "sentence-transformers==5.0.0",
 ]
 
 [tool.uv]

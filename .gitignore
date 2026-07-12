@@ -205,3 +205,6 @@ frontend/.turbo/
 frontend/next-env.d.ts
 frontend/*.tsbuildinfo
 frontend/tsconfig.tsbuildinfo
+
+# uv 创建的虚拟环境
+.venv/

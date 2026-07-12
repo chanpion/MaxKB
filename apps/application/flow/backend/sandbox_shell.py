@@ -4,7 +4,7 @@ import re
 
 from deepagents.backends import LocalShellBackend
 from deepagents.backends.protocol import ExecuteResponse
-from maxkb.const import CONFIG
+from maxkb.const import CONFIG, PROJECT_DIR
 
 _enable_sandbox = bool(int(CONFIG.get("SANDBOX", 0)))
 _run_user = "sandbox" if _enable_sandbox else getpass.getuser()
@@ -66,7 +66,7 @@ class SandboxShellBackend(LocalShellBackend):
             # 用 runuser 在子进程里切换用户，父进程凭据保持不变，
             # 避免父进程 ruid/euid 不一致导致 execve 报 Permission denied
             command = (
-                "env -i LD_PRELOAD=/opt/maxkb-app/sandbox/lib/sandbox.so "
+                "env -i LD_PRELOAD={} ".format(os.path.join(PROJECT_DIR, "sandbox", "lib", "sandbox.so"))
                 f'PATH="${{PATH}}" PYTHONPATH="${{PYTHONPATH}}" gosu {_run_user} {command}'
             )
             # command = f"runuser -u {_run_user} -- env -i PATH=${{PATH}} {command}"

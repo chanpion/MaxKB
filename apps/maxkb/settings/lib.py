@@ -20,7 +20,8 @@ if not os.path.exists(celery_data_dir) or not os.path.isdir(celery_data_dir):
 # Celery using redis as broker
 redis_celery_once_db = CONFIG.get("REDIS_DB")
 redis_celery_db = CONFIG.get('REDIS_DB')
-CELERY_BROKER_URL_FORMAT = '%(protocol)s://:%(password)s@%(host)s:%(port)s/%(db)s'
+# ?protocol=2 强制 RESP2，禁用 HELLO 协商（兼容低版本/非标准 Redis）
+CELERY_BROKER_URL_FORMAT = '%(protocol)s://:%(password)s@%(host)s:%(port)s/%(db)s?protocol=2'
 if CONFIG.get('REDIS_SENTINEL_MASTER') and CONFIG.get('REDIS_SENTINEL_SENTINELS'):
     sentinels_str = CONFIG.get('REDIS_SENTINEL_SENTINELS')
     sentinels = [

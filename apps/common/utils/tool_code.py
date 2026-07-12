@@ -25,7 +25,7 @@ from common.utils.logger import maxkb_logger
 _enable_sandbox = bool(int(CONFIG.get("SANDBOX", 0)))
 _run_user = "sandbox" if _enable_sandbox else getpass.getuser()
 _sandbox_path = (
-    CONFIG.get("SANDBOX_HOME", "/opt/maxkb-app/sandbox")
+    CONFIG.get("SANDBOX_HOME", os.path.join(PROJECT_DIR, "sandbox"))
     if _enable_sandbox
     else os.path.join(PROJECT_DIR, "data", "sandbox")
 )
@@ -112,7 +112,7 @@ class ToolExecutor:
 try:
     import os, sys, json
     from contextlib import redirect_stdout
-    path_to_exclude = ['/opt/py3/lib/python3.11/site-packages', '/opt/maxkb-app/apps']
+    path_to_exclude = [os.path.join(os.path.dirname(os.__file__), 'site-packages'), os.path.join(PROJECT_DIR, 'apps')]
     sys.path = [p for p in sys.path if p not in path_to_exclude]
     sys.path += {_sandbox_python_sys_path}
     _id = os.environ.get("_ID")
@@ -312,7 +312,7 @@ import os, sys, logging
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger("mcp").setLevel(logging.ERROR)
 logging.getLogger("mcp.server").setLevel(logging.ERROR)
-path_to_exclude = ['/opt/py3/lib/python3.11/site-packages', '/opt/maxkb-app/apps']
+path_to_exclude = [os.path.join(os.path.dirname(os.__file__), 'site-packages'), os.path.join(PROJECT_DIR, 'apps')]
 sys.path = [p for p in sys.path if p not in path_to_exclude]
 sys.path += {_sandbox_python_sys_path}
 {set_run_user}

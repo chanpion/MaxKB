@@ -46,7 +46,7 @@ class Config(dict):
         # 最大连接数
         "REDIS_MAX_CONNECTIONS": 100,
         # 外置语言包路径
-        "EXTERNAL_LOCALE_PATH": "/opt/maxkb/local/locales",
+        "EXTERNAL_LOCALE_PATH": os.path.join(PROJECT_DIR, "local", "locales"),
     }
 
     def get_debug(self) -> bool:
@@ -81,7 +81,10 @@ class Config(dict):
                 "OPTIONS": {
                     "CLIENT_CLASS": "django_redis.client.DefaultClient",
                     "PASSWORD": self.get("REDIS_PASSWORD"),
-                    "CONNECTION_POOL_KWARGS": {"max_connections": int(self.get("REDIS_MAX_CONNECTIONS"))},
+                    # protocol=2 注入连接池，禁用 HELLO 协商（兼容低版本/非标准 Redis）
+                    "CONNECTION_POOL_KWARGS": {"max_connections": int(self.get("REDIS_MAX_CONNECTIONS")), "protocol": 2},
+                    # 兼容低版本/非标准 Redis（不支持 HELLO 协商）时强制 RESP2
+                    "REDIS_CLIENT_KWARGS": self.get("REDIS_CLIENT_KWARGS", {"protocol": 2}),
                 },
             },
         }
@@ -129,7 +132,11 @@ class Config(dict):
     def get_sandbox_python_package_paths(self):
         return self.get(
             "SANDBOX_PYTHON_PACKAGE_PATHS",
-            "/opt/py3/lib/python3.11/site-packages,/opt/maxkb-app/sandbox/python-packages,/opt/maxkb/python-packages",
+            os.path.join(os.path.dirname(os.__file__), "site-packages")
+            + ","
+            + os.path.join(PROJECT_DIR, "sandbox", "python-packages")
+            + ","
+            + os.path.join(PROJECT_DIR, "python-packages"),
         )
 
     def get_admin_path(self):

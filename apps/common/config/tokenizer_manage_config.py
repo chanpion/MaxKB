@@ -9,6 +9,8 @@
 
 import os
 
+from maxkb.const import PROJECT_DIR
+
 class MKTokenizer:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
@@ -24,7 +26,7 @@ class TokenizerManage:
     def get_tokenizer():
         from tokenizers import Tokenizer
         # 创建Tokenizer
-        model_path = os.path.join("/opt/maxkb-app", "model", "tokenizer", "models--bert-base-cased")
+        model_path = os.path.join(PROJECT_DIR, "model", "tokenizer", "models--bert-base-cased")
         with open(f"{model_path}/refs/main", encoding="utf-8") as f: snapshot = f.read()
         TokenizerManage.tokenizer = Tokenizer.from_file(f"{model_path}/snapshots/{snapshot}/tokenizer.json")
         return MKTokenizer(TokenizerManage.tokenizer)

@@ -3,6 +3,7 @@ import {NextIntlClientProvider} from 'next-intl'
 import {getMessages} from 'next-intl/server'
 import {AntdRegistry} from '@ant-design/nextjs-registry'
 import Providers from '@/components/Providers'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: 'MaxKB 管理控制台',

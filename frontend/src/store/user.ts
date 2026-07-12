@@ -18,6 +18,8 @@ export interface UserInfo {
 interface UserStore {
   userInfo: UserInfo | null
   workspace_id: string
+  rsaKey: string | null
+  fetchRsa: () => Promise<string | null>
   setUserInfo: (u: UserInfo | null) => void
   getLanguage: () => string
   setLanguage: (lang: string) => void
@@ -31,6 +33,15 @@ interface UserStore {
 export const useUserStore = create<UserStore>((set, get) => ({
   userInfo: null,
   workspace_id: '',
+  rsaKey: null,
+  // 从 /profile 的 data.rsa 取 RSA 公钥（对齐 Vue 端 user.rsaKey）
+  fetchRsa: () => {
+    return loginApi.getProfile().then((res: any) => {
+      const key = res?.data?.rsa ?? null
+      set({rsaKey: key})
+      return key
+    })
+  },
   setUserInfo: (u) => set({userInfo: u}),
   getLanguage: () => {
     if (typeof window === 'undefined') return 'zh'

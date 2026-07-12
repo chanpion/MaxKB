@@ -1,6 +1,6 @@
 'use client'
 import React, {forwardRef, useImperativeHandle, useState} from 'react'
-import {Modal, List} from 'antd'
+import {Modal} from 'antd'
 import {RawIcon} from '@/components/AppIcon'
 import {loadSharedApi} from '@/lib/api/shared-api'
 import {useTranslations} from 'next-intl'
@@ -37,18 +37,26 @@ const SelectProviderDialog = forwardRef<SelectProviderDialogRef, {onChange: (p: 
         onCancel={() => setOpen(false)}
         footer={null}
         destroyOnClose
+        width={480}
       >
-        <List
-          dataSource={list}
-          renderItem={(item) => (
-            <List.Item style={{cursor: 'pointer'}} onClick={() => select(item)}>
-              <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                <RawIcon html={item.icon} />
-                <span>{item.name}</span>
-              </span>
-            </List.Item>
-          )}
-        />
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
+          {list.map((item) => (
+            <div
+              key={item.provider || item.name}
+              onClick={() => select(item)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+                cursor: 'pointer', borderRadius: 6, border: '1px solid #f0f0f0',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#1677FF'; e.currentTarget.style.background = 'rgba(22,119,255,0.04)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#f0f0f0'; e.currentTarget.style.background = 'transparent' }}
+            >
+              <RawIcon html={item.icon} />
+              <span className="ellipsis-1">{item.name}</span>
+            </div>
+          ))}
+        </div>
       </Modal>
     )
   },

@@ -1,7 +1,8 @@
 'use client'
 import React, {useEffect, useRef, useState} from 'react'
-import {Row, Col, Input, Dropdown, Button, Empty, Checkbox, Tag, Upload, message} from 'antd'
+import {Row, Col, Input, Select, Dropdown, Button, Empty, Checkbox, Tag, Upload, message} from 'antd'
 import {MoreOutlined} from '@ant-design/icons'
+import {useRouter} from '@/i18n/navigation'
 import CardBox from '@/components/CardBox'
 import KnowledgeIcon from '@/components/KnowledgeIcon'
 import InfiniteScroll from '@/components/InfiniteScroll'
@@ -10,6 +11,7 @@ import permissionMap from '@/permission'
 import {useFolderStore, useUserStore, useKnowledgeStore} from '@/store'
 import {loadSharedApi} from '@/lib/api/shared-api'
 import knowledgeApi from '@/lib/api/knowledge/knowledge'
+import {loginApi} from '@/lib/api/login'
 import {SourceTypeEnum} from '@/enums/common'
 import {useTranslations} from 'next-intl'
 import {MsgConfirm, MsgSuccess} from '@/utils/message'
@@ -30,6 +32,7 @@ import SyncWebDialog from './SyncWebDialog'
 
 export default function KnowledgeListContainer() {
   const t = useTranslations()
+  const router = useRouter()
   const folder = useFolderStore()
   const user = useUserStore()
   const knowledge = useKnowledgeStore()
@@ -39,10 +42,12 @@ export default function KnowledgeListContainer() {
 
   const [loading, setLoading] = useState(false)
   const loadingRef = useRef(false)
-  const [searchForm, setSearchForm] = useState<{name: string}>({name: ''})
+  const [searchForm, setSearchForm] = useState<{name: string; create_user?: string}>({name: ''})
   const [pagination, setPagination] = useState({current_page: 1, page_size: 30, total: 0})
   const [isBatch, setIsBatch] = useState(false)
   const [multipleSelection, setMultipleSelection] = useState<any[]>([])
+  const [sortField, setSortField] = useState<string>('create_time')
+  const [userOptions, setUserOptions] = useState<any[]>([])
 
   const [currentCreateDialog, setCurrentCreateDialog] = useState<React.ReactElement | null>(null)
   const [currentFolder, setCurrentFolder] = useState<any>(null)
@@ -228,13 +233,36 @@ export default function KnowledgeListContainer() {
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
       <div style={{display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap'}}>
+        <Select
+          value={sortField}
+          onChange={setSortField}
+          style={{width: 120}}
+          options={[
+            {label: '创建时间', value: 'create_time'},
+            {label: '名称 A-Z', value: 'name_asc'},
+            {label: '名称 Z-A', value: 'name_desc'},
+          ]}
+        />
         <Input
           value={searchForm.name}
           allowClear
           onChange={(e) => setSearchForm((s) => ({...s, name: e.target.value}))}
           onPressEnter={onSearch}
           placeholder={t('common.searchBar.placeholder')}
-          style={{width: 240}}
+          style={{width: 200}}
+        />
+        <Select
+          showSearch
+          allowClear
+          value={searchForm.create_user}
+          onChange={(v) => setSearchForm((s) => ({...s, create_user: v}))}
+          placeholder="创建人"
+          style={{width: 130}}
+          filterOption={false}
+          onSearch={(val) => {
+            if (val) loginApi.getUserList({name: val}).then((res: any) => setUserOptions(res.data || []))
+          }}
+          options={userOptions.map((u: any) => ({label: u.nick_name || u.username, value: u.id}))}
         />
         {!isBatch ? (
           <>
@@ -293,6 +321,7 @@ export default function KnowledgeListContainer() {
                     icon={<KnowledgeIcon type={item.type} />}
                     title={item.name}
                     description={item.desc}
+                    onClick={() => router.push(`/knowledge/${item.id}/document`)}
                     subTitle={
                       <span style={{fontSize: 12, color: 'rgba(0,0,0,0.45)'}}>
                         {i18n_name(item.nick_name)}

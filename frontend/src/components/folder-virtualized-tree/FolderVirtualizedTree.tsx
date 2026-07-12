@@ -1,10 +1,17 @@
 'use client'
 import React, {useEffect, useState} from 'react'
 import {Tree, Spin} from 'antd'
+import type {TreeProps} from 'antd'
+import {FolderOutlined, FolderOpenOutlined} from '@ant-design/icons'
 import folderApi from '@/lib/api/workspace/folder'
 import {useFolderStore, useUserStore} from '@/store'
 import AppIcon from '@/components/AppIcon'
 import type {SourceTypeEnum} from '@/enums/common'
+
+const iconMap: Record<string, React.ReactNode> = {
+  all: <AppIcon iconName="app-all-menu-active" />,
+  share: <AppIcon iconName="app-shared-active" />,
+}
 
 export default function FolderVirtualizedTree({
   source,
@@ -24,10 +31,18 @@ export default function FolderVirtualizedTree({
     folderApi
       .getFolder(source as string, {})
       .then((ok: any) => {
-        const folders = (ok.data || []).map((f: any) => ({key: f.id, title: f.name, ...f}))
+        const raw = Array.isArray(ok.data) ? ok.data : (ok.data?.records || ok.data?.children || [])
+        const folders = raw
+          .filter((f: any) => f.id)
+          .map((f: any) => {
+            const children = f.children
+              ? f.children.filter((c: any) => c.id).map((c: any) => ({key: c.id, title: c.name, isLeaf: true, ...c}))
+              : undefined
+            return {key: f.id, title: f.name, children, icon: <FolderOutlined />, ...f}
+          })
         setTreeData([
-          {key: 'all', title: '全部', icon: <AppIcon iconName="app-all-menu-active" />, isRoot: true},
-          {key: 'share', title: '共享', icon: <AppIcon iconName="app-shared-active" />, isRoot: true},
+          {key: 'all', title: '全部', icon: iconMap.all, isRoot: true},
+          {key: 'share', title: '共享', icon: iconMap.share, isRoot: true},
           ...folders,
         ])
         setLoading(false)
@@ -47,7 +62,7 @@ export default function FolderVirtualizedTree({
     else setSelectedKeys(['all'])
   }, [folderStore.currentFolder])
 
-  const handleSelect = (keys: any[]) => {
+  const handleSelect: TreeProps['onSelect'] = (keys: any[]) => {
     const key = keys[0]
     if (!key) return
     setSelectedKeys([key])
@@ -56,16 +71,24 @@ export default function FolderVirtualizedTree({
     onSelect?.(key === 'all' ? {id: nodeId} : {id: key})
   }
 
-  if (loading) return <Spin />
+  if (loading) return <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Spin /></div>
 
   return (
-    <Tree
-      treeData={treeData}
-      selectedKeys={selectedKeys}
-      onSelect={handleSelect}
-      blockNode
-      defaultExpandAll
-      style={{maxHeight: 'calc(100vh - 200px)', overflow: 'auto'}}
-    />
+    <div style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
+      <Tree
+        treeData={treeData}
+        selectedKeys={selectedKeys}
+        onSelect={handleSelect}
+        blockNode
+        defaultExpandAll
+        showIcon
+        style={{padding: '4px 0'}}
+        titleRender={(node: any) => (
+          <span style={{fontSize: 13, fontWeight: node.isRoot ? 500 : 400, color: node.isRoot ? '#1a1a1a' : '#333'}}>
+            {node.title}
+          </span>
+        )}
+      />
+    </div>
   )
 }

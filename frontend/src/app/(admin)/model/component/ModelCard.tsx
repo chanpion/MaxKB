@@ -142,13 +142,13 @@ export default function ModelCard({
         style={{minHeight: 135}}
       >
         <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: 13}}>
-          <li style={{display: 'flex', marginBottom: 4}}>
-            <span style={{color: 'rgba(0,0,0,0.45)', width: 64}}>{t('views.model.modelForm.model_type.label')}</span>
-            <span className="ellipsis-1">{t(modelType[current.model_type] || current.model_type)}</span>
+          <li style={{display: 'flex', marginBottom: 4, overflow: 'hidden'}}>
+            <span style={{color: 'rgba(0,0,0,0.45)', flexShrink: 0, marginRight: 8}}>{t('views.model.modelForm.model_type.label')}</span>
+            <span className="ellipsis-1" style={{flex: 1, minWidth: 0}}>{t(modelType[current.model_type] || current.model_type)}</span>
           </li>
-          <li style={{display: 'flex'}}>
-            <span style={{color: 'rgba(0,0,0,0.45)', width: 64}}>{t('views.model.modelForm.base_model.label')}</span>
-            <span className="ellipsis-1">{current.model_name}</span>
+          <li style={{display: 'flex', overflow: 'hidden'}}>
+            <span style={{color: 'rgba(0,0,0,0.45)', flexShrink: 0, marginRight: 8}}>{t('views.model.modelForm.base_model.label')}</span>
+            <span className="ellipsis-1" style={{flex: 1, minWidth: 0}}>{current.model_name}</span>
           </li>
         </ul>
         {(current.status === 'ERROR' || current.status === 'PAUSE_DOWNLOAD') && (

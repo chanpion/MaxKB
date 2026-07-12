@@ -7,13 +7,18 @@
     "submit": "登 录",
     "success": "登录成功",
     "usernameRequired": "请输入用户名",
-    "passwordRequired": "请输入密码"
+    "passwordRequired": "请输入密码",
+    "captcha": "验证码",
+    "captchaRequired": "请输入验证码",
+    "refreshCaptcha": "点击刷新验证码",
+    "rsaFailed": "公钥获取失败，请刷新页面",
+    "encryptFailed": "加密失败，请重试"
   },
   "menu": {
-    "home": "工作台",
+    "home": "首页",
     "knowledge": "知识库",
-    "model": "模型管理",
-    "application": "应用管理",
+    "model": "模型",
+    "application": "智能体",
     "tool": "工具",
     "trigger": "触发器",
     "system": "系统管理"
@@ -29,7 +34,24 @@
     "statKnowledge": "知识库数",
     "statDocument": "文档数",
     "statConversation": "对话数",
-    "quick": "快捷入口"
+    "quick": "快捷入口",
+    "activeUsers": "活跃用户数",
+    "newUsers": "新增用户数",
+    "chatCount": "对话数",
+    "chats": "对话",
+    "monitoringStatistics": "监控统计",
+    "charts": {
+      "tokensTotal": "Token 总数",
+      "userSatisfaction": "用户满意度",
+      "approval": "赞同",
+      "disapproval": "反对"
+    },
+    "pastDayOptions": {
+      "past7Days": "过去 7 天",
+      "past30Days": "过去 30 天",
+      "past90Days": "过去 90 天",
+      "past183Days": "过去 183 天"
+    }
   },
   "common": {
     "loading": "加载中...",

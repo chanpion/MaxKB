@@ -1,0 +1,841 @@
+{
+  "config": {
+    "argv": [
+      "/Users/chenpp/.nvm/versions/node/v22.22.1/bin/node",
+      "/Users/chenpp/workspace/my/MaxKB/frontend/node_modules/.bin/playwright",
+      "test",
+      "--config=e2e/playwright.config.ts",
+      "e2e/smoke.spec.ts"
+    ],
+    "configFile": "/Users/chenpp/workspace/my/MaxKB/frontend/e2e/playwright.config.ts",
+    "rootDir": "/Users/chenpp/workspace/my/MaxKB/frontend/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/chenpp/workspace/my/MaxKB/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/chenpp/workspace/my/MaxKB/frontend/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "e2e/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "smoke.spec.ts",
+      "file": "smoke.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "MaxKB E2E 冒烟验证",
+          "file": "smoke.spec.ts",
+          "line": 93,
+          "column": 6,
+          "specs": [],
+          "suites": [
+            {
+              "title": "1. 登录流程",
+              "file": "smoke.spec.ts",
+              "line": 116,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "1.1 登录页渲染正常",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1562,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:00:38.390Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-57eca5053767c064d90b",
+                  "file": "smoke.spec.ts",
+                  "line": 117,
+                  "column": 5
+                },
+                {
+                  "title": "1.2 登录表单提交 → token 存储 → 跳转首页",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 4567,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:00:40.202Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-aa7f67f1fbe2de95506b",
+                  "file": "smoke.spec.ts",
+                  "line": 130,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "2. 首页",
+              "file": "smoke.spec.ts",
+              "line": 208,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "2.1 首页显示欢迎语与用户名",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 4594,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:00:44.783Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-672b7ac4a2bdf1460da7",
+                  "file": "smoke.spec.ts",
+                  "line": 220,
+                  "column": 5
+                },
+                {
+                  "title": "2.2 首页显示统计卡片",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 4595,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:00:49.391Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-8bec767c1520274dd665",
+                  "file": "smoke.spec.ts",
+                  "line": 228,
+                  "column": 5
+                },
+                {
+                  "title": "2.3 首页显示快捷按钮",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 4608,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:00:53.999Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-c8a5ca9006ff7c944087",
+                  "file": "smoke.spec.ts",
+                  "line": 236,
+                  "column": 5
+                },
+                {
+                  "title": "2.4 首页无 console/network 错误",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 4504,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:00:58.629Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-6cdad943e5db02992e5e",
+                  "file": "smoke.spec.ts",
+                  "line": 243,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "3. 模型页面",
+              "file": "smoke.spec.ts",
+              "line": 251,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "3.1 provider 接口正常返回",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 9290,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:03.148Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-8b716f6a60f970526a8f",
+                  "file": "smoke.spec.ts",
+                  "line": 262,
+                  "column": 5
+                },
+                {
+                  "title": "3.2 model list 接口正常返回",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 6780,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:12.458Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-0cd39e6a944f84811f8b",
+                  "file": "smoke.spec.ts",
+                  "line": 278,
+                  "column": 5
+                },
+                {
+                  "title": "3.3 模型页面无 console/network 错误",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 6836,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:19.251Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-85bdb03de98495523b3b",
+                  "file": "smoke.spec.ts",
+                  "line": 292,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "4. 知识库页面",
+              "file": "smoke.spec.ts",
+              "line": 302,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "4.1 folder 树接口正常返回",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 6471,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:26.101Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-97b3ea6465a2b071a755",
+                  "file": "smoke.spec.ts",
+                  "line": 313,
+                  "column": 5
+                },
+                {
+                  "title": "4.2 knowledge list 接口正常返回",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 6521,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:32.589Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-fd6cb2fc4f6b7183a8c2",
+                  "file": "smoke.spec.ts",
+                  "line": 331,
+                  "column": 5
+                },
+                {
+                  "title": "4.3 知识库页面无 console/network 错误",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 6460,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:39.123Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-f14c6d72afcdcb3eec64",
+                  "file": "smoke.spec.ts",
+                  "line": 349,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "5. 未登录重定向",
+              "file": "smoke.spec.ts",
+              "line": 359,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "5.1 未登录访问 /home → 重定向到 /login",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1176,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:45.597Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-44d33365e19cc2cbd4a1",
+                  "file": "smoke.spec.ts",
+                  "line": 360,
+                  "column": 5
+                },
+                {
+                  "title": "5.2 未登录访问 /model → 重定向到 /login",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1173,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:46.789Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-23993c6adfc95ad5cfe9",
+                  "file": "smoke.spec.ts",
+                  "line": 372,
+                  "column": 5
+                },
+                {
+                  "title": "5.3 未登录访问 /knowledge → 重定向到 /login",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1170,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:47.975Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-944bb2e0d221eeedea25",
+                  "file": "smoke.spec.ts",
+                  "line": 380,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "6. 已登录重定向",
+              "file": "smoke.spec.ts",
+              "line": 391,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "6.1 已登录访问 /login → 重定向到 /home",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 5274,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:49.158Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-0b0dac66e3a57a3aebd5",
+                  "file": "smoke.spec.ts",
+                  "line": 392,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "7. 404 与特殊路由",
+              "file": "smoke.spec.ts",
+              "line": 410,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "7.1 访问不存在的路由 → 显示 404 页面",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1984,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:54.447Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-1dda8283d4e7e458a937",
+                  "file": "smoke.spec.ts",
+                  "line": 411,
+                  "column": 5
+                },
+                {
+                  "title": "7.2 __probe 探针页正常",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1224,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:56.439Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-3d5b5dd24d5beb2553a2",
+                  "file": "smoke.spec.ts",
+                  "line": 419,
+                  "column": 5
+                }
+              ]
+            },
+            {
+              "title": "8. 根路径分流",
+              "file": "smoke.spec.ts",
+              "line": 429,
+              "column": 8,
+              "specs": [
+                {
+                  "title": "8.1 未登录访问 / → 重定向到 /login",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 1205,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:57.670Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-260386d7ee9f83a5eda5",
+                  "file": "smoke.spec.ts",
+                  "line": 430,
+                  "column": 5
+                },
+                {
+                  "title": "8.2 已登录访问 / → 重定向到 /home",
+                  "ok": true,
+                  "tags": [],
+                  "tests": [
+                    {
+                      "timeout": 60000,
+                      "annotations": [],
+                      "expectedStatus": "passed",
+                      "projectId": "chromium",
+                      "projectName": "chromium",
+                      "results": [
+                        {
+                          "workerIndex": 0,
+                          "parallelIndex": 0,
+                          "status": "passed",
+                          "duration": 5510,
+                          "errors": [],
+                          "stdout": [],
+                          "stderr": [],
+                          "retry": 0,
+                          "startTime": "2026-07-11T08:01:58.885Z",
+                          "annotations": [],
+                          "attachments": []
+                        }
+                      ],
+                      "status": "expected"
+                    }
+                  ],
+                  "id": "4219922fea2e2bd3c691-22b7344fe3e18477dd59",
+                  "file": "smoke.spec.ts",
+                  "line": 438,
+                  "column": 5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-11T08:00:37.924Z",
+    "duration": 86533.95999999999,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

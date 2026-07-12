@@ -51,8 +51,8 @@ export default function ModelPage() {
   }
 
   return (
-    <div style={{display: 'flex', gap: 16, height: 'calc(100vh - 200px)'}}>
-      <div style={{width: 240, overflow: 'auto', background: '#fff', borderRadius: 8, padding: 8, flexShrink: 0}}>
+    <div style={{display: 'flex', gap: 16, height: 'calc(100vh - 56px - 48px)'}}>
+      <div style={{width: 240, overflow: 'auto', background: '#fff', borderRadius: 8, padding: 8, flexShrink: 0, display: 'flex', flexDirection: 'column'}}>
         <Provider data={modelStore.providerList} active={activeProvider} onClick={clickList} />
       </div>
       <div style={{flex: 1, overflow: 'auto', background: '#fff', borderRadius: 8, padding: 16}}>

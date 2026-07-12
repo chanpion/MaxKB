@@ -7,7 +7,12 @@
     "submit": "Login",
     "success": "Login success",
     "usernameRequired": "Please enter username",
-    "passwordRequired": "Please enter password"
+    "passwordRequired": "Please enter password",
+    "captcha": "Captcha",
+    "captchaRequired": "Please enter captcha",
+    "refreshCaptcha": "Click to refresh captcha",
+    "rsaFailed": "Failed to get public key, please refresh",
+    "encryptFailed": "Encryption failed, please retry"
   },
   "menu": {
     "home": "Workspace",
@@ -29,7 +34,24 @@
     "statKnowledge": "Knowledge bases",
     "statDocument": "Documents",
     "statConversation": "Conversations",
-    "quick": "Quick access"
+    "quick": "Quick access",
+    "activeUsers": "Active Users",
+    "newUsers": "New Users",
+    "chatCount": "Chats",
+    "chats": "Chats",
+    "monitoringStatistics": "Monitoring",
+    "charts": {
+      "tokensTotal": "Total Tokens",
+      "userSatisfaction": "User Satisfaction",
+      "approval": "Likes",
+      "disapproval": "Dislikes"
+    },
+    "pastDayOptions": {
+      "past7Days": "Last 7 days",
+      "past30Days": "Last 30 days",
+      "past90Days": "Last 90 days",
+      "past183Days": "Last 183 days"
+    }
   },
   "common": {
     "loading": "Loading...",

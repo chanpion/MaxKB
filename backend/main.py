@@ -16,7 +16,7 @@ os.environ.setdefault("SERVER_NAME", "web")
 
 def main() -> None:
     settings = get_settings()
-    uvicorn.run(app, host="0.0.0.0", port=8080, log_level=settings.log_level.lower())
+    uvicorn.run(app, host="0.0.0.0", port=8081, log_level=settings.log_level.lower())
 
 
 if __name__ == "__main__":

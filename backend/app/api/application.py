@@ -46,19 +46,20 @@ router = APIRouter(prefix="/api/application", tags=["application"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=ApplicationPage)
+@router.get("", response_model=list[ApplicationOut])
 async def list_applications(
-    page: int = 1,
-    size: int = 10,
+    workspace_id: str | None = None,
+    name: str | None = None,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
-) -> ApplicationPage:
-    total = await session.scalar(select(func.count()).select_from(Application))
-    result = await session.execute(
-        select(Application).order_by(Application.create_time.desc()).offset((page - 1) * size).limit(size)
-    )
-    rows = result.scalars().all()
-    return ApplicationPage(list=[ApplicationOut.model_validate(a) for a in rows], total=total or 0)
+) -> list[ApplicationOut]:
+    conditions = []
+    if workspace_id:
+        conditions.append(Application.workspace_id == workspace_id)
+    if name:
+        conditions.append(Application.name.ilike(f"%{name}%"))
+    result = await session.execute(select(Application).where(*conditions).order_by(Application.create_time.desc()))
+    return [ApplicationOut.model_validate(a) for a in result.scalars().all()]
 
 
 # ---------------------------------------------------------------------------
@@ -563,4 +564,9 @@ async def list_applications_paginated(
         .limit(page_size)
     )
     rows = result.scalars().all()
-    return ApplicationPage(list=[ApplicationOut.model_validate(a) for a in rows], total=total or 0)
+    return ApplicationPage(
+        records=[ApplicationOut.model_validate(a) for a in rows],
+        total=total or 0,
+        current=page,
+        size=page_size,
+    )

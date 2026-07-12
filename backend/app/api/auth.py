@@ -44,7 +44,22 @@ def _to_user_out(user: User) -> UserOut:
         ws_role_list.append("USER:/WORKSPACE/default")
     permissions = list(ws_role_list)
     if "ADMIN" in role_list:
+        ws_role_list.append("WORKSPACE_MANAGE")
+        ws_role_list.append("WORKSPACE_MANAGE:/WORKSPACE/default")
         permissions.append("SYSTEM_MANAGE")
+        permissions.append("WORKSPACE_MANAGE")
+        permissions.append("WORKSPACE_MANAGE:/WORKSPACE/default")
+        # Resource-level permissions for knowledge bases, applications, etc.
+        permissions.append("KNOWLEDGE_READ")
+        permissions.append("KNOWLEDGE_READ:/WORKSPACE/default")
+        permissions.append("KNOWLEDGE_DOCUMENT_READ")
+        permissions.append("KNOWLEDGE_DOCUMENT_READ:/WORKSPACE/default")
+        permissions.append("APPLICATION_READ")
+        permissions.append("APPLICATION_READ:/WORKSPACE/default")
+        permissions.append("TOOL_READ")
+        permissions.append("TOOL_READ:/WORKSPACE/default")
+        permissions.append("MODEL_READ")
+        permissions.append("MODEL_READ:/WORKSPACE/default")
     return UserOut(
         id=user.id,
         username=user.username,

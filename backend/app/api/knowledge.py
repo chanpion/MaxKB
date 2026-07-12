@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid as uuid_module
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -572,12 +572,37 @@ async def batch_cancel_task(
 @router.post("/{knowledge_id}/document/batch_create")
 async def batch_create_documents(
     knowledge_id: str,
-    body: dict,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Stub: batch create documents."""
-    return {"result": True}
+    """Batch create documents from split paragraphs."""
+    body = await request.json()
+    if not isinstance(body, list):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Body must be a list")
+
+    knowledge = await session.get(Knowledge, knowledge_id)
+    if knowledge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
+
+    created = []
+    for item in body:
+        name = item.get("name", "document")
+        paragraphs = item.get("paragraphs", [])
+        doc = Document(
+            knowledge_id=knowledge_id,
+            name=name,
+            type=knowledge.type,
+            status="WAIT",
+            user_id=current_user.id,
+            meta={"paragraphs": paragraphs},
+        )
+        session.add(doc)
+        await session.flush()
+        created.append(str(doc.id))
+
+    await session.commit()
+    return {"result": True, "document_ids": created, "count": len(created)}
 
 
 @router.post("/{knowledge_id}/document/batch_export")
@@ -869,12 +894,36 @@ async def get_split_pattern(
 @router.post("/{knowledge_id}/document/split")
 async def split_document(
     knowledge_id: str,
-    body: dict,
+    file: UploadFile = File(...),
+    patterns: str = Form("[]"),
+    limit: int = Form(500),
+    with_filter: bool = Form(True),
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
-) -> dict:
-    """Stub: split a document."""
-    return {"result": True}
+) -> list[dict]:
+    """Split preview: upload a file and return paragraph preview as an array."""
+    content = await file.read()
+    text = content.decode("utf-8", errors="replace")
+    import json as _json
+    try:
+        pattern_data = _json.loads(patterns)
+    except Exception:
+        pattern_data = []
+    # Split text into paragraphs by double newlines
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    preview = [
+        {
+            "name": f"{file.filename or 'document'}-{i + 1}",
+            "content": [
+                {
+                    "title": p[:50],
+                    "content": p,
+                }
+            ],
+        }
+        for i, p in enumerate(paragraphs[:20])
+    ]
+    return preview
 
 
 # ---------------------------------------------------------------------------

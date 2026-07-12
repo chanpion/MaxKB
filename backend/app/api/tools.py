@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,6 +85,53 @@ async def list_tools(
     )
     rows = result.scalars().all()
     return ToolPage(list=[ToolOut.model_validate(t) for t in rows], total=total or 0)
+
+
+@router.get("/tool_list")
+async def list_tools_by_type(
+    workspace_id: str = "default",
+    scope: str | None = None,
+    tool_type: str | None = None,
+    tool_type_list: list[str] | None = Query(default=None, alias="tool_type_list[]"),
+    folder_id: str | None = None,
+    name: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    """Legacy-compatible ``tool_list`` endpoint (Django ``ToolView.Query``).
+
+    Returns ``{"shared_tools": [...], "tools": [...]}`` where ``tools`` are the
+    workspace-scoped tools and ``shared_tools`` are SHARED-scope tools, both
+    filtered by ``tool_type`` / ``tool_type_list``. The agent settings page
+    consumes ``res.data.shared_tools`` + ``res.data.tools``.
+    """
+
+    def _type_conditions(conds: list) -> list:
+        if tool_type:
+            conds.append(Tool.tool_type == tool_type)
+        elif tool_type_list:
+            conds.append(Tool.tool_type.in_(tool_type_list))
+        return conds
+
+    type_conds = _type_conditions([])
+    if name:
+        type_conds.append(Tool.name.ilike(f"%{name}%"))
+
+    workspace_conds = [Tool.workspace_id == workspace_id]
+    if scope:
+        workspace_conds.append(Tool.scope == scope)
+    workspace_conds.extend(type_conds)
+    if folder_id:
+        workspace_conds.append(Tool.folder_id == folder_id)
+
+    result = await session.execute(select(Tool).where(*workspace_conds).order_by(Tool.create_time.desc()))
+    tools = [ToolOut.model_validate(t) for t in result.scalars().all()]
+
+    shared_conds = [Tool.scope == "SHARED", *type_conds]
+    sresult = await session.execute(select(Tool).where(*shared_conds).order_by(Tool.create_time.desc()))
+    shared_tools = [ToolOut.model_validate(t) for t in sresult.scalars().all()]
+
+    return {"shared_tools": shared_tools, "tools": tools}
 
 
 @router.post("", response_model=ToolOut, status_code=status.HTTP_201_CREATED)

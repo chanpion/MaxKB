@@ -151,8 +151,13 @@ class ApplicationOut(SQLModel):
 
 
 class ApplicationPage(SQLModel):
-    list: Any = []
+    # Field names aligned with the legacy Django ``Result`` envelope so the
+    # original ``ui/`` frontend (which reads ``res.data.records`` /
+    # ``res.data.total``) keeps working.
+    records: Any = []
     total: int = 0
+    current: int = 1
+    size: int = 10
 
 
 ApplicationPage.model_rebuild()

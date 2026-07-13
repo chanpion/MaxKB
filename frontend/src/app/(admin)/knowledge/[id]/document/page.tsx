@@ -80,11 +80,16 @@ export default function KnowledgeDocumentPage() {
         <Space>
           <Button icon={<ReloadOutlined />} onClick={loadDocs}>刷新</Button>
           <Upload beforeUpload={(file) => {
-            const form = new FormData()
-            form.append('file', file)
-            documentApi.postDocumentUpload(kid, form).then(() => {
-              message.success('上传成功')
-              loadDocs()
+            const fileName = file.name
+            documentApi.createDocument(kid, {name: fileName, type: 0}).then((res: any) => {
+              const docId = res.data?.id
+              if (!docId) { message.error('创建文档失败'); return }
+              const form = new FormData()
+              form.append('file', file)
+              documentApi.postDocumentUpload(kid, docId, form).then(() => {
+                message.success('上传成功')
+                loadDocs()
+              }).catch(() => {})
             }).catch(() => {})
             return false
           }} showUploadList={false}>

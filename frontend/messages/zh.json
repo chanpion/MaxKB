@@ -66,6 +66,7 @@
     "confirm": "确定",
     "name": "名称",
     "desc": "描述",
+    "search": "搜索",
     "searchBar": {
       "placeholder": "搜索"
     },
@@ -85,13 +86,32 @@
     "modify": "修改",
     "requiredMessage": "必填",
     "operation": "操作",
-    "required": "必填"
+    "required": "必填",
+    "deleteConfirm": "确认删除",
+    "back": "返回"
+  },
+  "charts": {
+    "tokensTotal": "Token 总数",
+    "userSatisfaction": "用户满意度",
+    "approval": "赞同",
+    "disapproval": "反对"
   },
   "components": {
     "folder": {
       "addFolder": "新建文件夹",
       "folderNamePlaceholder": "请输入文件夹名称",
-      "requiredMessage": "请选择文件夹"
+      "requiredMessage": "请选择文件夹",
+      "timeSort": "时间排序",
+      "descTime": "创建时间降序",
+      "ascTime": "创建时间升序",
+      "nameSort": "名称排序",
+      "ascName": "名称 A→Z",
+      "descName": "名称 Z→A",
+      "customSort": "自定义排序",
+      "custom": "自定义",
+      "addChildFolder": "新建子文件夹",
+      "deleteConfirmMessage": "删除后不可恢复，确认删除？",
+      "editFolder": "编辑文件夹"
     }
   },
   "views": {

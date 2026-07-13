@@ -66,6 +66,7 @@
     "confirm": "Confirm",
     "name": "Name",
     "desc": "Description",
+    "search": "Search",
     "searchBar": {
       "placeholder": "Search"
     },
@@ -85,13 +86,32 @@
     "modify": "Modify",
     "requiredMessage": "Required",
     "operation": "Operation",
-    "required": "Required"
+    "required": "Required",
+    "deleteConfirm": "Confirm Delete",
+    "back": "Back"
+  },
+  "charts": {
+    "tokensTotal": "Total Tokens",
+    "userSatisfaction": "User Satisfaction",
+    "approval": "Likes",
+    "disapproval": "Dislikes"
   },
   "components": {
     "folder": {
       "addFolder": "New Folder",
       "folderNamePlaceholder": "Please enter folder name",
-      "requiredMessage": "Please select a folder"
+      "requiredMessage": "Please select a folder",
+      "timeSort": "Time",
+      "descTime": "Creation time desc",
+      "ascTime": "Creation time asc",
+      "nameSort": "Name",
+      "ascName": "Name A→Z",
+      "descName": "Name Z→A",
+      "customSort": "Custom",
+      "custom": "Custom",
+      "addChildFolder": "New Child Folder",
+      "deleteConfirmMessage": "Cannot be undone, confirm delete?",
+      "editFolder": "Edit Folder"
     }
   },
   "views": {

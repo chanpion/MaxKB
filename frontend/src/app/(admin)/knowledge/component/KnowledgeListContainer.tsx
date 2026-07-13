@@ -73,6 +73,8 @@ export default function KnowledgeListContainer() {
       scope: 'WORKSPACE',
     }
     if (searchForm.name) params.name = searchForm.name
+    if (searchForm.create_user) params.create_user = searchForm.create_user
+    if (sortField) params.order = sortField
     knowledgeApi
       .getKnowledgeList(params)
       .then((ok: any) => {
@@ -92,7 +94,7 @@ export default function KnowledgeListContainer() {
   useEffect(() => {
     fetchPage(1, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder.currentFolder?.id, folder.refreshCounter])
+  }, [folder.currentFolder?.id, folder.refreshCounter, sortField, searchForm.create_user])
 
   const onSearch = () => {
     setPagination((p) => ({...p, current_page: 1}))
@@ -222,6 +224,13 @@ export default function KnowledgeListContainer() {
     }
   }
 
+  const KB_ACCENT: Record<number, string> = {
+    0: '#1677ff',
+    1: '#722ed1',
+    2: '#13c2c2',
+    3: '#13c2c2',
+  }
+
   const createDropdownItems = [
     {key: 'general', label: t('views.knowledge.knowledgeType.generalKnowledge')},
     {key: 'web', label: t('views.knowledge.knowledgeType.webKnowledge')},
@@ -316,14 +325,15 @@ export default function KnowledgeListContainer() {
           <Checkbox.Group value={multipleSelection} onChange={setMultipleSelection}>
             <Row gutter={[16, 16]}>
               {knowledge.knowledgeList.map((item: any) => (
-                <Col key={item.id} xs={24} sm={12} md={12} lg={8} xl={6}>
+                <Col key={item.id} xs={24} sm={12} md={12} lg={8} xl={8}>
                   <CardBox
+                    accent={KB_ACCENT[item.type ?? 0]}
                     icon={<KnowledgeIcon type={item.type} />}
                     title={item.name}
                     description={item.desc}
                     onClick={() => router.push(`/knowledge/${item.id}/document`)}
                     subTitle={
-                      <span style={{fontSize: 12, color: 'rgba(0,0,0,0.45)'}}>
+                      <span style={{fontSize: 12, color: 'inherit', opacity: 0.55}}>
                         {i18n_name(item.nick_name)}
                         <span style={{margin: '0 4px'}}>{t('common.createdIn')}</span>
                         {dateFormat(item.create_time)}
@@ -333,16 +343,20 @@ export default function KnowledgeListContainer() {
                       isBatch ? (
                         <Checkbox value={item.id} />
                       ) : item.type === 1 ? (
-                        <Tag color="purple">WEB</Tag>
+                        <Tag color="purple" style={{borderRadius: 6, marginInlineEnd: 0}}>WEB</Tag>
                       ) : null
                     }
                     footer={
-                      <div>
-                        <span style={{fontWeight: 600, marginRight: 4}}>{item?.document_count || 0}</span>
-                        <span style={{color: 'rgba(0,0,0,0.45)'}}>{t('views.knowledge.document_count')}</span>
-                        <span style={{margin: '0 8px'}}>|</span>
-                        <span style={{fontWeight: 600, marginRight: 4}}>{numberFormat(item?.char_length)}</span>
-                        <span style={{color: 'rgba(0,0,0,0.45)'}}>{t('common.character')}</span>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 14, fontSize: 12}}>
+                        <span style={{display: 'inline-flex', alignItems: 'baseline', gap: 4}}>
+                          <span style={{fontWeight: 700, fontSize: 14}}>{item?.document_count || 0}</span>
+                          <span style={{opacity: 0.55}}>{t('views.knowledge.document_count')}</span>
+                        </span>
+                        <span style={{opacity: 0.25}}>|</span>
+                        <span style={{display: 'inline-flex', alignItems: 'baseline', gap: 4}}>
+                          <span style={{fontWeight: 700, fontSize: 14}}>{numberFormat(item?.char_length)}</span>
+                          <span style={{opacity: 0.55}}>{t('common.character')}</span>
+                        </span>
                       </div>
                     }
                     mouseEnter={

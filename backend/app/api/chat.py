@@ -222,11 +222,9 @@ async def chat_message(
     if application is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
 
-    if body.stream and application.type == "SIMPLE":
-        return await _chat_simple_stream(application, body, chat, session)
+    if application.type == "WORK_FLOW":
+        return await _chat_workflow_stream(application, body, chat, session)
 
-    # Non-streaming or workflow: return JSON
-    # For now, default to simple streaming
     return await _chat_simple_stream(application, body, chat, session)
 
 
@@ -277,21 +275,102 @@ async def _chat_simple_stream(
             yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n\n"
         finally:
             # Persist chat record
-            record = ChatRecord(
-                chat_id=chat.id,
-                problem_text=body.message,
-                answer_text=full_answer.replace("data: ", "").replace("\n\n", ""),
-                message_tokens=len(body.message),
-                answer_tokens=len(full_answer),
-                index=chat.chat_record_count + 1,
-                vote_status="-1",
-            )
-            session.add(record)
-            chat.chat_record_count = chat.chat_record_count + 1
-            # Update abstract from first message
-            if chat.abstract == "新对话":
-                chat.abstract = body.message[:50]
-            await session.commit()
+            answer_text = full_answer.replace("data: ", "").replace("\n\n", "")
+            await _persist_chat_record(chat, body.message, answer_text, session)
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
+
+
+async def _persist_chat_record(
+    chat: Chat,
+    message: str,
+    answer: str,
+    session: AsyncSession,
+) -> None:
+    """Persist a :class:`ChatRecord` for the problem/answer pair and update
+    the chat abstract from the first message."""
+    record = ChatRecord(
+        chat_id=chat.id,
+        problem_text=message,
+        answer_text=answer,
+        message_tokens=len(message),
+        answer_tokens=len(answer),
+        index=chat.chat_record_count + 1,
+        vote_status="-1",
+    )
+    session.add(record)
+    chat.chat_record_count = chat.chat_record_count + 1
+    if chat.abstract == "新对话":
+        chat.abstract = message[:50]
+    await session.commit()
+
+
+async def _chat_workflow_stream(
+    application: Application,
+    body: ChatMessageRequest,
+    chat: Chat,
+    session: AsyncSession,
+) -> StreamingResponse:
+    """Route a ``WORK_FLOW``-type application through :class:`WorkflowEngine`.
+
+    The application's ``work_flow`` graph is executed node-by-node. LLM and
+    embedding credentials are resolved from the application's configured models
+    and injected so that ``ai-chat`` / ``search-knowledge`` nodes can call
+    providers without per-node configuration. Progress is streamed as SSE frames
+    (node_start / node_end / chunk / done).
+    """
+    from app.workflows.engine import WorkflowEngine, sse_event
+
+    flow = application.work_flow or {}
+    if not flow.get("nodes"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application has no workflow defined")
+
+    model_row = await session.get(Model, application.model_id) if application.model_id else None
+
+    model_config: dict | None = None
+    if model_row is not None:
+        model_config = {
+            "provider": model_row.provider,
+            "model_name": model_row.model_name,
+            "credential": model_row.credential or {},
+        }
+
+    embedding_config = _embedding_dict(
+        await session.get(Model, application.knowledge_setting.get("embedding_model_id"))
+        if application.knowledge_setting and application.knowledge_setting.get("embedding_model_id")
+        else None
+    )
+
+    params: dict = {"question": body.message}
+    engine = WorkflowEngine(
+        flow,
+        params,
+        model_config=model_config,
+        embedding_config=embedding_config,
+    )
+
+    async def event_source():
+        final_answer = ""
+        try:
+            async for frame in engine.stream():
+                # Accumulate text from answer/node_end frames
+                try:
+                    stripped = frame.replace("data: ", "").rstrip("\n")
+                    payload = json.loads(stripped)
+                    if payload.get("type") in ("answer", "node_end"):
+                        content = payload.get("content") or payload.get("answer") or ""
+                        final_answer += content
+                    elif payload.get("type") == "done":
+                        final_answer = payload.get("answer", final_answer)
+                except json.JSONDecodeError:
+                    pass
+                yield frame
+        except Exception as exc:
+            yield sse_event({"type": "error", "message": str(exc)})
+        finally:
+            # Clean SSE prefix from answer text
+            final_answer = final_answer.replace("data: ", "").replace("\n\n", "")
+            await _persist_chat_record(chat, body.message, final_answer, session)
 
     return StreamingResponse(event_source(), media_type="text/event-stream")
 

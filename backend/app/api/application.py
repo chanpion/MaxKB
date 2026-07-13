@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import secrets
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -24,6 +25,7 @@ from app.models.application import (
 )
 from app.models.models_provider import Model
 from app.models.user import User
+from app.providers.base import resolve_credential
 from app.schemas.application import (
     AccessTokenOut,
     AccessTokenUpdate,
@@ -475,14 +477,36 @@ async def application_stats(
     )
 
 
-def _embedding_dict(model: Model | None) -> dict | None:
-    if model is None:
+async def _resolve_embedding_config(session: AsyncSession, application: Application) -> dict[str, Any] | None:
+    """Resolve the embedding model for an application.
+
+    Legacy Django's ``Application`` has no ``embedding_model_id`` column — the
+    embedding model is owned by each linked ``Knowledge`` base. Derive it from
+    the first linked knowledge base (matching legacy ``search_knowledge``
+    behaviour) and return a provider-ready dict (credential resolved to a dict),
+    or ``None`` when no embedding model can be resolved.
+    """
+    from app.models.knowledge import Knowledge
+
+    mapping = await session.execute(
+        select(ApplicationKnowledgeMapping.knowledge_id)
+        .where(ApplicationKnowledgeMapping.application_id == application.id)
+        .limit(1)
+    )
+    kid = mapping.scalar_one_or_none()
+    if kid is None:
+        return None
+    knowledge = await session.get(Knowledge, kid)
+    if knowledge is None or knowledge.embedding_model_id is None:
+        return None
+    row = await session.get(Model, knowledge.embedding_model_id)
+    if row is None:
         return None
     return {
-        "provider": model.provider,
-        "model_name": model.model_name,
-        "credential": model.credential,
-        "dimensions": (model.meta or {}).get("dimensions"),
+        "provider": row.provider,
+        "model_name": row.model_name,
+        "credential": resolve_credential(row.credential),
+        "dimensions": (row.meta or {}).get("dimensions"),
     }
 
 
@@ -497,10 +521,10 @@ async def chat(
     if application is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
 
+    if application.type == "WORK_FLOW":
+        return await _chat_workflow(application, body, session)
+
     model_row = await session.get(Model, application.model_id) if application.model_id else None
-    embedding_model_row = (
-        await session.get(Model, application.embedding_model_id) if application.embedding_model_id else None
-    )
     if model_row is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application has no chat model configured")
 
@@ -513,14 +537,14 @@ async def chat(
         )
         knowledge_ids = [str(k) for k in mapping.scalars().all()]
 
-    embedding = body.embedding or _embedding_dict(embedding_model_row)
+    embedding = body.embedding or await _resolve_embedding_config(session, application)
 
     from app.agents.chat_agent import ChatAgent
 
     agent = ChatAgent(
         model_provider=model_row.provider,
         model_name=model_row.model_name,
-        credential=model_row.credential,
+        credential=resolve_credential(model_row.credential),
         knowledge_ids=knowledge_ids,
         embedding=embedding,
         top_n=body.top_n,
@@ -534,6 +558,59 @@ async def chat(
                 yield frame
         except Exception as exc:
             yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n\n"
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
+
+
+async def _chat_workflow(
+    application: Application,
+    body: ChatRequest,
+    session: AsyncSession,
+) -> StreamingResponse:
+    """Route a ``WORK_FLOW``-type application through :class:`WorkflowEngine`.
+
+    The application's ``work_flow`` graph is executed node-by-node. The active
+    LLM / embedding credentials are resolved from the application's configured
+    models and injected as ``model_config`` / ``embedding_config`` so that
+    ``ai-chat`` / ``search-knowledge`` nodes can call providers without per-node
+    credentials. Progress is streamed back as SSE (node_start / node_end /
+    chunk / interrupted / done).
+    """
+    from app.workflows.engine import WorkflowEngine, sse_event
+
+    flow = application.work_flow or {}
+    if not flow.get("nodes"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Application has no workflow defined")
+
+    model_row = await session.get(Model, application.model_id) if application.model_id else None
+
+    model_config: dict[str, Any] | None = None
+    if model_row is not None:
+        model_config = {
+            "provider": model_row.provider,
+            "model_name": model_row.model_name,
+            "credential": resolve_credential(model_row.credential),
+            "model_params_setting": model_row.meta or {},
+        }
+
+    embedding_config = await _resolve_embedding_config(session, application)
+
+    # ``question`` is read by the start node; everything else becomes a global
+    # variable referenceable as ``global.<key>`` inside the flow.
+    params: dict[str, Any] = {"question": body.message}
+    engine = WorkflowEngine(
+        flow,
+        params,
+        model_config=model_config,
+        embedding_config=embedding_config,
+    )
+
+    async def event_source():
+        try:
+            async for frame in engine.stream():
+                yield frame
+        except Exception as exc:  # propagate as an SSE error frame
+            yield sse_event({"type": "error", "message": str(exc)})
 
     return StreamingResponse(event_source(), media_type="text/event-stream")
 

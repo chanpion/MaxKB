@@ -22,6 +22,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID as _UUID
 
 import redis.asyncio as aioredis
 from arq import ArqRedis, Worker, cron
@@ -57,27 +58,117 @@ async def ingest_document_task(
     """arq task: ingest one document asynchronously.
 
     Mirrors the legacy ``embedding_by_document`` Celery task. A fresh async
-    session is opened here (workers run outside a request context).
+    session is opened here (workers run outside a request context). The
+    document ``status`` is driven through ``PENDING`` -> ``INGESTING`` ->
+    ``SUCCESS`` | ``ERROR`` so the frontend can poll progress.
     """
+    from app.models.knowledge import Document
     from app.rag.pipeline import ingest_document
 
     async with SessionLocal() as session:
-        result = await ingest_document(
-            session,
-            knowledge_id=knowledge_id,
-            document_id=document_id,
-            user_id=user_id,
-            filename=filename,
-            content=content,
-            embedding=embedding,
-            **kwargs,
-        )
-    return {
-        "document_id": result.document_id,
-        "paragraph_count": result.paragraph_count,
-        "embedding_count": result.embedding_count,
-        "char_length": result.char_length,
-    }
+        doc = await session.get(Document, _UUID(document_id))
+        if doc is not None:
+            doc.status = "INGESTING"
+            doc.status_meta = {"step": "ingesting", "filename": filename[0:128]}
+            await session.commit()
+
+        try:
+            result = await ingest_document(
+                session,
+                knowledge_id=knowledge_id,
+                document_id=document_id,
+                user_id=user_id,
+                filename=filename,
+                content=content,
+                embedding=embedding,
+                **kwargs,
+            )
+        except Exception as exc:
+            doc = await session.get(Document, _UUID(document_id))
+            if doc is not None:
+                doc.status = "ERROR"
+                doc.status_meta = {"step": "error", "error": str(exc)[:500]}
+                await session.commit()
+            raise
+
+        doc = await session.get(Document, _UUID(document_id))
+        if doc is not None:
+            doc.status = "SUCCESS"
+            doc.status_meta = {
+                "step": "completed",
+                "paragraph_count": result.paragraph_count,
+                "embedding_count": result.embedding_count,
+                "char_length": result.char_length,
+            }
+            await session.commit()
+
+        return {
+            "document_id": result.document_id,
+            "paragraph_count": result.paragraph_count,
+            "embedding_count": result.embedding_count,
+            "char_length": result.char_length,
+        }
+
+
+async def ingest_paragraphs_task(
+    ctx: dict[str, Any],
+    *,
+    knowledge_id: str,
+    document_id: str,
+    user_id: str | None,
+    embedding: dict[str, Any],
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """arq task: embed already-persisted Paragraph rows of one document.
+
+    Used by the ``batch_create`` API, where the frontend has already split the
+    document into paragraphs and the web process wrote the ``Document`` +
+    ``Paragraph`` rows. This worker only computes embeddings and writes
+    ``embedding`` rows, driving the document ``status`` PENDING -> INGESTING ->
+    SUCCESS | ERROR so the frontend can poll progress.
+    """
+    from app.models.knowledge import Document
+    from app.rag.pipeline import embed_paragraphs
+
+    async with SessionLocal() as session:
+        doc = await session.get(Document, _UUID(document_id))
+        if doc is not None:
+            doc.status = "INGESTING"
+            doc.status_meta = {"step": "ingesting"}
+            await session.commit()
+
+        try:
+            result = await embed_paragraphs(
+                session,
+                knowledge_id=knowledge_id,
+                document_id=document_id,
+                embedding=embedding,
+            )
+        except Exception as exc:
+            doc = await session.get(Document, _UUID(document_id))
+            if doc is not None:
+                doc.status = "ERROR"
+                doc.status_meta = {"step": "error", "error": str(exc)[:500]}
+                await session.commit()
+            raise
+
+        doc = await session.get(Document, _UUID(document_id))
+        if doc is not None:
+            doc.status = "SUCCESS"
+            doc.status_meta = {
+                "step": "completed",
+                "paragraph_count": result.paragraph_count,
+                "embedding_count": result.embedding_count,
+                "char_length": result.char_length,
+            }
+            await session.commit()
+
+        return {
+            "document_id": result.document_id,
+            "paragraph_count": result.paragraph_count,
+            "embedding_count": result.embedding_count,
+            "char_length": result.char_length,
+        }
 
 
 async def cleanup_logs_task(ctx: dict[str, Any]) -> int:
@@ -115,6 +206,7 @@ from app.trigger.tasks import run_trigger  # noqa: E402
 # Registered functions arq can resolve by qualified name.
 TASK_FUNCTIONS: list[Callable] = [
     ingest_document_task,
+    ingest_paragraphs_task,
     cleanup_logs_task,
     cleanup_chat_records_task,
     run_trigger,
@@ -180,6 +272,34 @@ async def enqueue_ingest(
             user_id=user_id,
             filename=filename,
             content=content,
+            embedding=embedding,
+            **kwargs,
+        )
+    finally:
+        await redis.aclose()
+
+
+async def enqueue_ingest_paragraphs(
+    *,
+    knowledge_id: str,
+    document_id: str,
+    user_id: str | None,
+    embedding: dict[str, Any],
+    **kwargs: Any,
+) -> None:
+    """Enqueue embedding of already-persisted paragraphs for one document.
+
+    Mirrors :func:`enqueue_ingest` but targets ``ingest_paragraphs_task`` (no
+    raw file content — the ``Paragraph`` rows already exist in the DB).
+    """
+    pool = aioredis.ConnectionPool.from_url(settings.redis_url)
+    redis = ArqRedis(pool_or_conn=pool)
+    try:
+        await redis.enqueue_job(
+            "app.core.tasks.ingest_paragraphs_task",
+            knowledge_id=knowledge_id,
+            document_id=document_id,
+            user_id=user_id,
             embedding=embedding,
             **kwargs,
         )

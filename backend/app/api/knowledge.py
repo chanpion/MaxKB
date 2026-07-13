@@ -10,17 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.security import get_current_user
+from app.core.tasks import enqueue_ingest
 from app.models.knowledge import Document, DocumentTag, Knowledge, KnowledgeFolder, Paragraph, Tag
 from app.models.models_provider import Model
 from app.models.user import User
+from app.providers.base import resolve_credential
 from app.schemas.knowledge import (
     DocumentCreate,
     DocumentOut,
     DocumentPage,
     DocumentUpdate,
     HitTestRequest,
-    HitTestResponse,
-    HitTestResult,
     KnowledgeCreate,
     KnowledgeOut,
     KnowledgePage,
@@ -125,6 +125,125 @@ async def create_knowledge_folder(
 # ---------------------------------------------------------------------------
 # Knowledge base sub-routes (MUST come before /{knowledge_id} catch-all)
 # ---------------------------------------------------------------------------
+
+
+@router.post("/upload")
+async def upload_knowledge_file(
+    file: UploadFile = File(...),
+    folder_id: str = Form("default"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """One-step upload: auto-create knowledge base + document, enqueue for ingestion if embedding model available.
+
+    Called by the standalone upload page (``knowledge/upload``). If a usable embedding model exists
+    (first one found in the database), ingestion is enqueued immediately. Otherwise the document
+    is created with status WAIT and the user must configure an embedding model separately.
+    """
+    from app.rag.pipeline import parse_file
+
+    _ = parse_file(file.filename or "document", await file.read())
+    _ = await file.seek(0)
+    content_bytes = await file.read()
+
+    knowledge = Knowledge(
+        name=file.filename or "Uploaded Document",
+        desc="",
+        type=0,
+        folder_id=folder_id,
+        workspace_id="default",
+        user_id=current_user.id,
+    )
+    session.add(knowledge)
+
+    # Find any embedding model to allow auto-ingestion
+    embedding_result = await session.execute(
+        select(Model).where(Model.model_type == "embedding").limit(1)
+    )
+    embedding_model_row = embedding_result.scalar_one_or_none()
+    if embedding_model_row is not None:
+        knowledge.embedding_model_id = embedding_model_row.id
+
+    await session.flush()
+
+    document = Document(
+        knowledge_id=knowledge.id,
+        name=file.filename or "document",
+        type=0,
+        status="PENDING" if embedding_model_row else "WAIT",
+        status_meta={"step": "queued", "filename": file.filename} if embedding_model_row else {},
+        user_id=current_user.id,
+    )
+    session.add(document)
+    await session.flush()
+    await session.commit()
+
+    if embedding_model_row is not None:
+        embedding = {
+            "provider": embedding_model_row.provider,
+            "model_name": embedding_model_row.model_name,
+            "credential": resolve_credential(embedding_model_row.credential),
+            "dimensions": (embedding_model_row.meta or {}).get("dimensions"),
+        }
+        await enqueue_ingest(
+            knowledge_id=str(knowledge.id),
+            document_id=str(document.id),
+            user_id=str(current_user.id) if current_user.id is not None else None,
+            filename=file.filename or "document",
+            content=content_bytes,
+            embedding=embedding,
+            with_filter=False,
+            limit=4096,
+        )
+
+    return {
+        "result": True,
+        "knowledge_id": str(knowledge.id),
+        "document_id": str(document.id),
+        "document_count": 1,
+    }
+
+
+@router.post("/workflow")
+async def create_workflow_knowledge(
+    body: dict,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Create a workflow-type knowledge base with an initial empty workflow."""
+    import uuid as _uuid
+
+    knowledge_id = _uuid.uuid7()
+    knowledge = Knowledge(
+        id=knowledge_id,
+        name=body.get("name", "Workflow Knowledge"),
+        desc=body.get("desc", ""),
+        type=body.get("type", 1),  # type=1 means workflow
+        scope=body.get("scope", "WORKSPACE"),
+        folder_id=body.get("folder_id", "default"),
+        workspace_id=body.get("workspace_id", "default"),
+        embedding_model_id=uuid_module.UUID(body["embedding_model_id"]) if body.get("embedding_model_id") else None,
+        user_id=current_user.id,
+        meta=body.get("meta", {}),
+    )
+    session.add(knowledge)
+
+    from app.models.knowledge import KnowledgeWorkflow
+
+    workflow = KnowledgeWorkflow(
+        id=_uuid.uuid7(),
+        knowledge_id=knowledge_id,
+        workspace_id=body.get("workspace_id", "default"),
+        work_flow=body.get("work_flow", {}),
+    )
+    session.add(workflow)
+    await session.commit()
+    await session.refresh(knowledge)
+
+    return {
+        "result": True,
+        "knowledge": KnowledgeOut.model_validate(knowledge).model_dump(mode="json"),
+    }
 
 
 @router.post("/base")
@@ -340,13 +459,19 @@ async def get_paragraph(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{knowledge_id}/hit_test", response_model=HitTestResponse)
+@router.post("/{knowledge_id}/hit_test", response_model=list[dict])
 async def hit_test(
     knowledge_id: str,
     body: HitTestRequest,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
-) -> HitTestResponse:
+) -> list[dict]:
+    """Legacy-compatible hit test.
+
+    Returns a **list** of paragraph hits (each with ``comprehensive_score``),
+    matching the legacy ``KnowledgeSerializer.HitTest.hit_test`` shape that the
+    frontend sorts with ``arraySort(res.data, 'comprehensive_score', true)``.
+    """
     knowledge = await session.get(Knowledge, knowledge_id)
     if knowledge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
@@ -365,38 +490,55 @@ async def hit_test(
         embedding_model_row.provider,
         embedding_model_row.model_name,
         embedding_model_row.credential or {},
-        [normalize_for_embedding(body.query)],
+        [normalize_for_embedding(body.query_text)],
         dimensions=dimensions,
     )
     if not vectors:
-        return HitTestResponse(results=[], total=0)
+        return []
 
     retriever = PgVectorRetriever()
     rows = await retriever.search(
         query_embedding=vectors[0],
         knowledge_ids=[knowledge_id],
-        top_n=body.top_n,
+        top_n=body.top_number,
         similarity=body.similarity,
         search_mode=body.search_mode,
-        query_text=body.query,
+        query_text=body.query_text,
     )
+    if not rows:
+        return []
+
+    paragraph_ids = [r["paragraph_id"] for r in rows]
+    p_result = await session.execute(select(Paragraph).where(Paragraph.id.in_(paragraph_ids)))
+    paragraphs = {p.id: p for p in p_result.scalars().all()}
+    doc_ids = {p.document_id for p in paragraphs.values()}
+    d_result = await session.execute(select(Document).where(Document.id.in_(doc_ids)))
+    documents = {d.id: d for d in d_result.scalars().all()}
 
     hits = []
     for r in rows:
-        doc = await session.get(Document, r.get("document_id"))
+        pid = r["paragraph_id"]
+        p = paragraphs.get(pid)
+        doc = documents.get(p.document_id) if p else None
+        similarity = float(r.get("similarity", 0.0))
         hits.append(
-            HitTestResult(
-                paragraph_id=r.get("paragraph_id"),
-                document_id=r.get("document_id"),
-                document_name=doc.name if doc else "",
-                content=r.get("content", ""),
-                title=r.get("title", ""),
-                similarity=r.get("similarity", 0.0),
-                hit_num=r.get("hit_num", 0),
-            )
+            {
+                "id": str(pid),
+                "paragraph_id": str(pid),
+                "document_id": str(p.document_id) if p else "",
+                "document_name": doc.name if doc else "",
+                "content": r.get("content", ""),
+                "title": r.get("title", ""),
+                "similarity": similarity,
+                "comprehensive_score": similarity,
+                "is_active": p.is_active if p else True,
+                "hit_num": p.hit_num if p else 0,
+                "star_num": 0,
+                "trample_num": 0,
+            }
         )
 
-    return HitTestResponse(results=hits, total=len(hits))
+    return hits
 
 
 # ---------------------------------------------------------------------------
@@ -576,7 +718,18 @@ async def batch_create_documents(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Batch create documents from split paragraphs."""
+    """Batch create documents from pre-split paragraphs and make them searchable.
+
+    The frontend has already split each document into paragraphs
+    (``[{title, content}]``). We persist a ``Document`` plus one ``Paragraph``
+    row per segment (preserving the provided title/content — no re-splitting),
+    then embed them so the knowledge base becomes retrievable. Embedding runs
+    asynchronously via arq when a worker/redis is available, with a synchronous
+    inline fallback so it still works in a single-process dev setup (链路 A).
+    """
+    from app.core.tasks import enqueue_ingest_paragraphs
+    from app.rag.pipeline import embed_paragraphs
+
     body = await request.json()
     if not isinstance(body, list):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Body must be a list")
@@ -585,23 +738,103 @@ async def batch_create_documents(
     if knowledge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
 
-    created = []
+    # Resolve the embedding model: prefer the KB's configured model, else the
+    # first available embedding model in the database.
+    embedding_model_row = None
+    if knowledge.embedding_model_id is not None:
+        candidate = await session.get(Model, knowledge.embedding_model_id)
+        if candidate is not None and candidate.model_type == "embedding":
+            embedding_model_row = candidate
+    if embedding_model_row is None:
+        emb_result = await session.execute(select(Model).where(Model.model_type == "embedding").limit(1))
+        embedding_model_row = emb_result.scalar_one_or_none()
+
+    embedding = None
+    if embedding_model_row is not None and embedding_model_row.model_type == "embedding":
+        embedding = {
+            "provider": embedding_model_row.provider,
+            "model_name": embedding_model_row.model_name,
+            "credential": resolve_credential(embedding_model_row.credential),
+            "dimensions": (embedding_model_row.meta or {}).get("dimensions"),
+        }
+
+    created: list[str] = []
+    pending: list[tuple[str, str | None]] = []  # (document_id, user_id)
     for item in body:
         name = item.get("name", "document")
-        paragraphs = item.get("paragraphs", [])
+        paragraphs = item.get("paragraphs", []) or []
         doc = Document(
             knowledge_id=knowledge_id,
             name=name,
             type=knowledge.type,
-            status="WAIT",
+            status="PENDING" if embedding is not None else "SUCCESS",
             user_id=current_user.id,
-            meta={"paragraphs": paragraphs},
+            meta={"paragraphs": paragraphs, "paragraph_count": len(paragraphs)},
         )
         session.add(doc)
         await session.flush()
+
+        for idx, para in enumerate(paragraphs):
+            session.add(
+                Paragraph(
+                    knowledge_id=knowledge_id,
+                    document_id=doc.id,
+                    content=para.get("content", ""),
+                    title=(para.get("title") or "")[0:256],
+                    position=idx + 1,
+                    is_active=True,
+                )
+            )
+
         created.append(str(doc.id))
+        if embedding is not None:
+            pending.append((str(doc.id), str(current_user.id) if current_user.id is not None else None))
 
     await session.commit()
+
+    # Embed: prefer arq (async); fall back to inline so it works without a worker.
+    for document_id, user_id in pending:
+        if embedding is None:
+            break
+        enqueued = False
+        try:
+            await enqueue_ingest_paragraphs(
+                knowledge_id=str(knowledge_id),
+                document_id=document_id,
+                user_id=user_id,
+                embedding=embedding,
+            )
+            enqueued = True
+        except Exception:
+            enqueued = False
+        if enqueued:
+            continue
+
+        # Inline fallback (no arq worker / redis unavailable).
+        try:
+            result = await embed_paragraphs(
+                session,
+                knowledge_id=str(knowledge_id),
+                document_id=document_id,
+                embedding=embedding,
+            )
+            doc = await session.get(Document, document_id)
+            if doc is not None:
+                doc.status = "SUCCESS"
+                doc.status_meta = {
+                    "step": "completed",
+                    "paragraph_count": result.paragraph_count,
+                    "embedding_count": result.embedding_count,
+                    "char_length": result.char_length,
+                }
+                await session.commit()
+        except Exception as exc:
+            doc = await session.get(Document, document_id)
+            if doc is not None:
+                doc.status = "ERROR"
+                doc.status_meta = {"step": "error", "error": str(exc)[:500]}
+                await session.commit()
+
     return {"result": True, "document_ids": created, "count": len(created)}
 
 
@@ -683,6 +916,68 @@ async def refresh_document(
     document.status_meta = {"step": "queued"}
     await session.commit()
     return {"result": True}
+
+
+@router.post("/{knowledge_id}/document/{document_id}/upload")
+async def upload_document_file(
+    knowledge_id: str,
+    document_id: str,
+    file: UploadFile = File(...),
+    with_filter: bool = Form(False),
+    limit: int = Form(4096),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Upload a source file and enqueue it for asynchronous ingestion.
+
+    The document must already exist (created via ``POST .../document``). The
+    file bytes are sent to the arq worker, which parses/splits/embeds and writes
+    paragraph + embedding rows. ``Document.status`` tracks progress:
+    ``PENDING`` -> ``INGESTING`` -> ``SUCCESS`` | ``ERROR``.
+    """
+    knowledge = await session.get(Knowledge, knowledge_id)
+    if knowledge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
+    if knowledge.embedding_model_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No embedding model configured")
+
+    document = await session.get(Document, document_id)
+    if document is None or str(document.knowledge_id) != knowledge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    embedding_model_row = await session.get(Model, knowledge.embedding_model_id)
+    if embedding_model_row is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedding model not found")
+    if embedding_model_row.model_type != "embedding":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Configured model is not an embedding model"
+        )
+
+    embedding = {
+        "provider": embedding_model_row.provider,
+        "model_name": embedding_model_row.model_name,
+        "credential": resolve_credential(embedding_model_row.credential),
+        "dimensions": (embedding_model_row.meta or {}).get("dimensions"),
+    }
+
+    document.name = file.filename or document.name
+    document.status = "PENDING"
+    document.status_meta = {"step": "queued", "filename": file.filename}
+    await session.commit()
+
+    content = await file.read()
+    await enqueue_ingest(
+        knowledge_id=str(knowledge_id),
+        document_id=str(document_id),
+        user_id=str(current_user.id) if current_user.id is not None else None,
+        filename=file.filename or "document",
+        content=content,
+        embedding=embedding,
+        with_filter=with_filter,
+        limit=limit,
+    )
+
+    return {"result": True, "document_id": str(document_id), "status": "PENDING"}
 
 
 @router.put("/{knowledge_id}/document/{document_id}/sync")
@@ -904,11 +1199,6 @@ async def split_document(
     """Split preview: upload a file and return paragraph preview as an array."""
     content = await file.read()
     text = content.decode("utf-8", errors="replace")
-    import json as _json
-    try:
-        pattern_data = _json.loads(patterns)
-    except Exception:
-        pattern_data = []
     # Split text into paragraphs by double newlines
     paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     preview = [

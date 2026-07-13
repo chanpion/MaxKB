@@ -82,6 +82,7 @@ class DocumentOut(SQLModel):
     hit_handling_method: str = "optimization"
     directly_return_similarity: float = 0.9
     meta: dict[str, Any] | None = None
+    status_meta: dict[str, Any] | None = None
     create_time: datetime | None = None
     update_time: datetime | None = None
 
@@ -124,25 +125,11 @@ ParagraphPage.model_rebuild()
 
 
 class HitTestRequest(SQLModel):
-    query: str
-    top_n: int = 10
+    # Field names match the legacy Django serializer + frontend payload.
+    query_text: str
+    top_number: int = 5
     similarity: float = 0.5
     search_mode: str = "embedding"  # embedding | keywords | blend
-
-
-class HitTestResult(SQLModel):
-    paragraph_id: uuid.UUID
-    document_id: uuid.UUID
-    document_name: str = ""
-    content: str = ""
-    title: str = ""
-    similarity: float = 0.0
-    hit_num: int = 0
-
-
-class HitTestResponse(SQLModel):
-    results: list[HitTestResult] = []
-    total: int = 0
 
 
 # --- Tags ---

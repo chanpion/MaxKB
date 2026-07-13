@@ -260,6 +260,13 @@ class WorkflowEngine:
             elif kind == "error":
                 yield sse_event({"type": "error", **payload})
         await prod
+        if self.interrupted is not None:
+            # A node (e.g. form) suspended the workflow awaiting user input.
+            # Surface it as an ``interrupted`` frame so the client can render
+            # the form and resume by re-running the engine with the values.
+            yield sse_event(
+                {"type": "interrupted", "form": self.interrupted.node_variable, "details": self.runtime_details}
+            )
         final = self._finalize()
         yield sse_event({"type": "done", "answer": final["answer"], "details": final["details"]})
 

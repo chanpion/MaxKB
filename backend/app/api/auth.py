@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -23,7 +23,9 @@ from app.schemas.auth import (
     PasswordResetRequest,
     ProfileUpdate,
     UserCreate,
+    UserManageOut,
     UserOut,
+    UserPage,
     UserUpdate,
 )
 
@@ -277,6 +279,62 @@ async def delete_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     await session.delete(user)
     await session.commit()
+
+
+def _to_user_manage_out(user: User) -> UserManageOut:
+    """Convert a User model to the management-list shape.
+
+    ``role`` is left as the raw string (e.g. ``"ADMIN"``) so the frontend's
+    ``row.role === 'ADMIN'`` check works. ``role_workspace`` is empty because the
+    refactor backend does not model the role-relation tables.
+    """
+    base_role = (user.role or "USER").strip()
+    role_list = [r.strip() for r in base_role.split(",") if r.strip()] or ["USER"]
+    return UserManageOut(
+        id=user.id,
+        username=user.username,
+        nick_name=user.nick_name or user.username,
+        email=user.email,
+        phone=user.phone,
+        is_active=user.is_active,
+        source=user.source or "LOCAL",
+        role=base_role,
+        role_name=role_list,
+        role_workspace={},
+        create_time=user.create_time,
+    )
+
+
+@router.get("/manage/{current_page}/{page_size}", response_model=UserPage)
+async def list_users_page(
+    current_page: int,
+    page_size: int,
+    username: str | None = None,
+    nick_name: str | None = None,
+    email: str | None = None,
+    is_active: bool | None = None,
+    source: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_roles("ADMIN")),
+) -> UserPage:
+    """Paginated user list (legacy: ``GET /user_manage/{current_page}/{page_size}``)."""
+    stmt = select(User)
+    if username:
+        stmt = stmt.where(User.username.ilike(f"%{username}%"))
+    if nick_name:
+        stmt = stmt.where(User.nick_name.ilike(f"%{nick_name}%"))
+    if email:
+        stmt = stmt.where(User.email.ilike(f"%{email}%"))
+    if is_active is not None:
+        stmt = stmt.where(User.is_active == is_active)
+    if source:
+        stmt = stmt.where(User.source == source)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+    stmt = stmt.order_by(User.create_time.desc()).offset((current_page - 1) * page_size).limit(page_size)
+    result = await session.execute(stmt)
+    users = result.scalars().all()
+    return UserPage(records=[_to_user_manage_out(u) for u in users], total=total or 0)
 
 
 # Re-export uuid so static analyzers don't flag the import; (kept for symmetry)

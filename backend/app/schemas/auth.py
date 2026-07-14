@@ -46,6 +46,33 @@ class UserOut(SQLModel):
     create_time: datetime | None = None
 
 
+class UserManageOut(SQLModel):
+    """User record for the management list page.
+
+    ``role`` is a plain string (e.g. ``"ADMIN"``) so the frontend's
+    ``row.role === 'ADMIN'`` switch-disable check works — unlike :class:`UserOut`
+    which exposes ``role`` as a list. ``role_workspace`` is empty in the refactor
+    backend because the role-relation tables are not modelled here.
+    """
+
+    id: uuid.UUID
+    username: str
+    nick_name: str
+    email: str | None = None
+    phone: str = ""
+    is_active: bool = True
+    source: str = ""
+    role: str = ""
+    role_name: list[str] = []
+    role_workspace: dict = {}
+    create_time: datetime | None = None
+
+
+class UserPage(SQLModel):
+    records: list[UserManageOut] = []
+    total: int = 0
+
+
 class UserCreate(SQLModel):
     username: str
     nick_name: str = ""

@@ -146,3 +146,57 @@ class TagOut(SQLModel):
     key: str
     value: str
     create_time: datetime | None = None
+
+
+# --- Termbase ---
+
+
+class TermbaseOut(SQLModel):
+    id: uuid.UUID
+    knowledge_id: uuid.UUID
+    content: str = ""
+    create_time: datetime | None = None
+    update_time: datetime | None = None
+
+
+class TermbasePage(SQLModel):
+    records: Any = []
+    total: int = 0
+
+
+TermbasePage.model_rebuild()
+
+
+# --- Problem ---
+
+
+class ProblemOut(SQLModel):
+    id: uuid.UUID
+    knowledge_id: uuid.UUID
+    content: str = ""
+    hit_num: int = 0
+    paragraph_count: int = 0
+    create_time: datetime | None = None
+    update_time: datetime | None = None
+
+
+class ProblemPage(SQLModel):
+    records: Any = []
+    total: int = 0
+
+
+ProblemPage.model_rebuild()
+
+
+class ProblemParagraphOut(SQLModel):
+    id: uuid.UUID
+    document_id: uuid.UUID
+    knowledge_id: uuid.UUID
+    content: str = ""
+    title: str = ""
+    status: str = ""
+    hit_num: int = 0
+    is_active: bool = True
+    position: int = 0
+    create_time: datetime | None = None
+    update_time: datetime | None = None

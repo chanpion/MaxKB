@@ -1,23 +1,12 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Card, Table, Button, Typography, Input, Space, message, Popconfirm, Tabs, Modal, Tag} from 'antd'
-import {HomeOutlined, FileTextOutlined, ExperimentOutlined, SettingOutlined, QuestionCircleOutlined, BookOutlined, PlusOutlined, DeleteOutlined, UserOutlined} from '@ant-design/icons'
+import {Breadcrumb, Card, Table, Button, Typography, Input, Space, message, Popconfirm, Modal, Tag} from 'antd'
+import {HomeOutlined, FileTextOutlined, PlusOutlined, DeleteOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
-import {useRouter, usePathname} from '@/i18n/navigation'
 import {termbaseApi} from '@/lib/api/knowledge/termbase'
 import {dateFormat} from '@/utils/time'
 
-const tabItems = [
-  {key: 'document', label: <><FileTextOutlined /> 文档</>},
-  {key: 'problem', label: <><QuestionCircleOutlined /> 问题</>},
-  {key: 'termbase', label: <><BookOutlined /> 术语库</>},
-  {key: 'hit-test', label: <><ExperimentOutlined /> 命中测试</>},
-  {key: 'chat-user', label: <><UserOutlined /> 对话用户</>},
-  {key: 'setting', label: <><SettingOutlined /> 设置</>},
-]
-
 export default function TermbasePage() {
-  const router = useRouter()
   const params = useParams()
   const kid = params.id as string
   const [data, setData] = useState<any[]>([])
@@ -38,7 +27,7 @@ export default function TermbasePage() {
 
   const handleCreate = () => {
     if (!newTerm.trim()) return
-    termbaseApi.postCreate(kid, {content: newTerm}).then(() => {
+    termbaseApi.postCreate(kid, [newTerm]).then(() => {
       message.success('创建成功'); setCreateOpen(false); setNewTerm(''); load()
     }).catch(() => {})
   }
@@ -53,9 +42,6 @@ export default function TermbasePage() {
         {title: <><HomeOutlined /> 首页</>},
         {title: <><FileTextOutlined /> 知识库详情</>},
       ]} />
-      <Tabs activeKey="termbase" items={tabItems}
-        onChange={(key) => router.push(`/knowledge/${kid}/${key}`)}
-        style={{marginBottom: 8}} />
       <Card style={{borderRadius: 8}}>
         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 16}}>
           <Typography.Title level={5} style={{margin: 0}}>术语库</Typography.Title>

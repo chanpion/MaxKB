@@ -55,15 +55,11 @@ export const useUserStore = create<UserStore>((set, get) => ({
     if (typeof window !== 'undefined') localStorage.setItem('workspace_id', id)
     set({workspace_id: id})
   },
+  // 纯取值，禁止在 getter 内调用 set（会引发重渲染死循环）。
+  // 写状态统一交给 setWorkspaceId / profile。
   getWorkspaceId: () => {
     const id = get().workspace_id || (typeof window !== 'undefined' ? localStorage.getItem('workspace_id') || '' : '')
-    if (!id || id === 'default') {
-      const fallback = 'default'
-      set({workspace_id: fallback})
-      return fallback
-    }
-    set({workspace_id: id})
-    return id
+    return id || 'default'
   },
   isPE: () => (get().userInfo?.role || []).includes('workspace_manage'),
   isEE: () => false,

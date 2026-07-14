@@ -141,3 +141,21 @@ a:hover {
     display: none;
   }
 }
+
+/* Knowledge base folder tree: let custom node background drive selection/hover */
+.kb-folder-tree .ant-tree-node-content-wrapper {
+  transition: background 0.15s ease;
+}
+.kb-folder-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: transparent !important;
+}
+.kb-folder-tree .ant-tree-node-content-wrapper:hover {
+  background: transparent !important;
+}
+.kb-folder-tree .ant-tree-treenode {
+  padding: 1px 0;
+  width: 100%;
+}
+.kb-folder-tree .ant-tree-node-content-wrapper {
+  width: 100%;
+}

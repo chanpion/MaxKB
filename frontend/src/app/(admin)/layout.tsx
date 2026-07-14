@@ -13,17 +13,21 @@ const HEADER_HEIGHT = 56
 export default function AdminLayout({children}: {children: React.ReactNode}) {
   const router = useRouter()
   const getToken = useLoginStore((s) => s.getToken)
+  const clearToken = useLoginStore((s) => s.clearToken)
   const isDark = useThemeStore((s) => s.isDark)
   const [checked, setChecked] = useState(false)
 
   useEffect(() => {
     const tk = getToken()
     if (!tk) {
+      // localStorage 无 token 但 cookie 可能残留，先清除 cookie 再跳登录，
+      // 否则 middleware 读取残留 cookie 会把 /login 又弹回 /home 造成死循环
+      clearToken()
       router.replace(LOGIN_PATH)
     } else {
       setChecked(true)
     }
-  }, [getToken, router])
+  }, [getToken, clearToken, router])
 
   if (!checked) {
     return (

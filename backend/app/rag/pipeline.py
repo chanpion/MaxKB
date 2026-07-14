@@ -87,16 +87,26 @@ async def ingest_document(
     doc_meta["allow_download"] = True
 
     char_length = sum(len(p.get("content", "")) for p in paragraphs_data)
-    document = Document(
-        id=_UUID(document_id),
-        knowledge_id=knowledge_id,
-        name=filename[0:128],
-        char_length=char_length,
-        user_id=user_id,
-        type=doc_type,
-        meta=doc_meta,
-    )
-    session.add(document)
+    # Upsert: the upload endpoint may have pre-created the Document row, so we
+    # update it in place instead of INSERT-ing a duplicate primary key.
+    document = await session.get(Document, _UUID(document_id))
+    if document is None:
+        document = Document(
+            id=_UUID(document_id),
+            knowledge_id=knowledge_id,
+            name=filename[0:128],
+            char_length=char_length,
+            user_id=user_id,
+            type=doc_type,
+            meta=doc_meta,
+        )
+        session.add(document)
+    else:
+        document.name = filename[0:128]
+        document.char_length = char_length
+        document.user_id = document.user_id or user_id
+        document.type = doc_type
+        document.meta = doc_meta
 
     # ---- Paragraph rows -----------------------------------------------------
     paragraph_objs: list[Paragraph] = []
@@ -114,7 +124,32 @@ async def ingest_document(
 
     await session.flush()
 
-    # ---- Embeddings (raw SQL for pgvector + tsvector) ------------------------
+    result = await _embed_paragraphs(
+        session,
+        knowledge_id=knowledge_id,
+        document_id=document_id,
+        paragraph_objs=paragraph_objs,
+        embedding=embedding,
+    )
+    return result
+
+
+async def _embed_paragraphs(
+    session: AsyncSession,
+    *,
+    knowledge_id: str | _UUID,
+    document_id: str | _UUID,
+    paragraph_objs: list[Paragraph],
+    embedding: dict[str, Any],
+) -> IngestionResult:
+    """Embed a set of already-persisted ``Paragraph`` rows and write ``embedding`` rows.
+
+    Shared by :func:`ingest_document` (paragraphs freshly created from raw
+    content) and :func:`embed_paragraphs` (paragraphs created upstream, e.g. by
+    the ``batch_create`` API from pre-split frontend data). The paragraph rows
+    are assumed to already exist in the database; this only computes chunk
+    embeddings and inserts them, then returns counts for status bookkeeping.
+    """
     embedding_count = 0
     provider = embedding["provider"]
     model_name = embedding["model_name"]
@@ -122,7 +157,7 @@ async def ingest_document(
     dimensions = embedding.get("dimensions")
 
     # Gather (paragraph, chunk_texts) pairs.
-    chunk_plan: list[tuple] = []
+    chunk_plan: list[tuple[Paragraph, list[str]]] = []
     for para in paragraph_objs:
         texts = chunk_text(para.content, chunk_size=256)
         para.chunks = texts  # mirror legacy Paragraph.chunks
@@ -164,10 +199,47 @@ async def ingest_document(
             await conn.commit()
 
     # Persist the (now chunked) paragraph rows and the document.
+    char_length = sum(len(para.content) for para in paragraph_objs)
     await session.commit()
     return IngestionResult(
-        document_id=document_id,
+        document_id=str(document_id),
         paragraph_count=len(paragraph_objs),
         embedding_count=embedding_count,
         char_length=char_length,
+    )
+
+
+async def embed_paragraphs(
+    session: AsyncSession,
+    *,
+    knowledge_id: str | _UUID,
+    document_id: str | _UUID,
+    embedding: dict[str, Any],
+) -> IngestionResult:
+    """Embed already-persisted ``Paragraph`` rows of a document.
+
+    Unlike :func:`ingest_document`, this does NOT parse or split content — the
+    ``Paragraph`` rows are assumed to already exist (e.g. created by the
+    ``batch_create`` API from pre-split frontend data). It only computes
+    embeddings and writes ``embedding`` rows, then returns counts.
+    """
+    from sqlalchemy import select
+
+    rows = await session.execute(
+        select(Paragraph).where(Paragraph.document_id == _UUID(document_id)).order_by(Paragraph.position)
+    )
+    paragraph_objs = list(rows.scalars().all())
+    if not paragraph_objs:
+        return IngestionResult(
+            document_id=str(document_id),
+            paragraph_count=0,
+            embedding_count=0,
+            char_length=0,
+        )
+    return await _embed_paragraphs(
+        session,
+        knowledge_id=knowledge_id,
+        document_id=document_id,
+        paragraph_objs=paragraph_objs,
+        embedding=embedding,
     )

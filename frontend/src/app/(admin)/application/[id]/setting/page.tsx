@@ -1,6 +1,6 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Form, Input, Button, Card, Select, message, Spin, Typography} from 'antd'
+import {Breadcrumb, Form, Input, Button, Card, Select, message, Spin, Typography, Tabs} from 'antd'
 import {HomeOutlined, AppstoreOutlined, ArrowLeftOutlined, SaveOutlined, KeyOutlined, MessageOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
 import {useRouter, usePathname} from '@/i18n/navigation'
@@ -14,10 +14,12 @@ export default function AppSettingPage() {
   const id = params.id as string
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [detail, setDetail] = useState<any>({})
   const [form] = Form.useForm()
 
   useEffect(() => {
-    applicationApi.getSetting(id).then((res: any) => {
+    applicationApi.getDetail(id).then((res: any) => {
+      setDetail(res.data || {})
       form.setFieldsValue(res.data)
     }).catch(() => {}).finally(() => setLoading(false))
   }, [id])
@@ -25,7 +27,7 @@ export default function AppSettingPage() {
   const handleSave = () => {
     form.validateFields().then((values) => {
       setSaving(true)
-      applicationApi.putSetting(id, values).then(() => {
+      applicationApi.putUpdate(id, {...detail, ...values}).then(() => {
         message.success('保存成功')
       }).catch(() => {}).finally(() => setSaving(false))
     })

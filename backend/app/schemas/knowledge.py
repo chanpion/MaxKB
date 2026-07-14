@@ -82,6 +82,7 @@ class DocumentOut(SQLModel):
     hit_handling_method: str = "optimization"
     directly_return_similarity: float = 0.9
     meta: dict[str, Any] | None = None
+    status_meta: dict[str, Any] | None = None
     create_time: datetime | None = None
     update_time: datetime | None = None
 
@@ -124,25 +125,11 @@ ParagraphPage.model_rebuild()
 
 
 class HitTestRequest(SQLModel):
-    query: str
-    top_n: int = 10
+    # Field names match the legacy Django serializer + frontend payload.
+    query_text: str
+    top_number: int = 5
     similarity: float = 0.5
     search_mode: str = "embedding"  # embedding | keywords | blend
-
-
-class HitTestResult(SQLModel):
-    paragraph_id: uuid.UUID
-    document_id: uuid.UUID
-    document_name: str = ""
-    content: str = ""
-    title: str = ""
-    similarity: float = 0.0
-    hit_num: int = 0
-
-
-class HitTestResponse(SQLModel):
-    results: list[HitTestResult] = []
-    total: int = 0
 
 
 # --- Tags ---
@@ -159,3 +146,57 @@ class TagOut(SQLModel):
     key: str
     value: str
     create_time: datetime | None = None
+
+
+# --- Termbase ---
+
+
+class TermbaseOut(SQLModel):
+    id: uuid.UUID
+    knowledge_id: uuid.UUID
+    content: str = ""
+    create_time: datetime | None = None
+    update_time: datetime | None = None
+
+
+class TermbasePage(SQLModel):
+    records: Any = []
+    total: int = 0
+
+
+TermbasePage.model_rebuild()
+
+
+# --- Problem ---
+
+
+class ProblemOut(SQLModel):
+    id: uuid.UUID
+    knowledge_id: uuid.UUID
+    content: str = ""
+    hit_num: int = 0
+    paragraph_count: int = 0
+    create_time: datetime | None = None
+    update_time: datetime | None = None
+
+
+class ProblemPage(SQLModel):
+    records: Any = []
+    total: int = 0
+
+
+ProblemPage.model_rebuild()
+
+
+class ProblemParagraphOut(SQLModel):
+    id: uuid.UUID
+    document_id: uuid.UUID
+    knowledge_id: uuid.UUID
+    content: str = ""
+    title: str = ""
+    status: str = ""
+    hit_num: int = 0
+    is_active: bool = True
+    position: int = 0
+    create_time: datetime | None = None
+    update_time: datetime | None = None

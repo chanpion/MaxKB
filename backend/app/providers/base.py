@@ -46,6 +46,31 @@ def decrypt_credential(token: str) -> str:
     return _get_fernet().decrypt(token.encode()).decode()
 
 
+def resolve_credential(raw: str) -> dict:
+    """Resolve a stored credential string into a dict for provider calls.
+
+    The shared ``model`` table stores credentials either as a plaintext JSON
+    string or as a Fernet-encrypted token of a JSON string (legacy Django
+    convention). Returns the parsed dict in both cases, or ``{}`` if the value
+    is empty / unparseable.
+    """
+    import json
+
+    raw = (raw or "").strip()
+    if not raw:
+        return {}
+    if raw.startswith("{"):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            pass
+    try:
+        plain = decrypt_credential(raw)
+        return json.loads(plain)
+    except Exception:
+        return {}
+
+
 def is_valid_credential(credential: dict, required_keys: list[str]) -> bool:
     """Mirror BaseModelCredential.is_valid: all required keys present & non-empty."""
     return all(bool(credential.get(k)) for k in required_keys)

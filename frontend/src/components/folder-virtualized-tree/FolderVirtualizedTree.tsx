@@ -5,7 +5,7 @@ import {SearchOutlined, CheckOutlined} from '@ant-design/icons'
 import type {TreeProps} from 'antd'
 import {FolderOutlined} from '@ant-design/icons'
 import folderApi from '@/lib/api/workspace/folder'
-import {useFolderStore, useUserStore} from '@/store'
+import {useFolderStore, useUserStore, useThemeStore} from '@/store'
 import AppIcon from '@/components/AppIcon'
 import type {SourceTypeEnum} from '@/enums/common'
 import {SORT_MENU_CONFIG, SORT_TYPES, type SortType} from './constants'
@@ -51,6 +51,7 @@ export default function FolderVirtualizedTree({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const folderStore = useFolderStore()
   const userStore = useUserStore()
+  const isDark = useThemeStore((s) => s.isDark)
   const t = useTranslations()
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
@@ -61,7 +62,8 @@ export default function FolderVirtualizedTree({
   const sourceKey = source === 'KNOWLEDGE' ? 'knowledge' : 'model'
   const perm = permissionMap[sourceKey]?.workspace || {}
 
-  const FOLDER_SORT_KEY = `${userStore.userInfo?.id || ''}-${userStore.getWorkspaceId()}-${source}-folder-sort-type`
+  const workspaceId = userStore.workspace_id || userStore.getWorkspaceId()
+  const FOLDER_SORT_KEY = `${userStore.userInfo?.id || ''}-${workspaceId}-${source}-folder-sort-type`
 
   const load = () => {
     setLoading(true)
@@ -97,15 +99,15 @@ export default function FolderVirtualizedTree({
   useEffect(() => {
     const id = folderStore.currentFolder?.id
     if (id === 'share') setSelectedKeys(['share'])
-    else if (id && id !== userStore.getWorkspaceId()) setSelectedKeys([id])
+    else if (id && id !== workspaceId) setSelectedKeys([id])
     else setSelectedKeys(['all'])
-  }, [folderStore.currentFolder, userStore])
+  }, [folderStore.currentFolder, workspaceId])
 
   const handleSelect: TreeProps['onSelect'] = (keys: any[]) => {
     const key = keys[0]
     if (!key) return
     setSelectedKeys([key])
-    const nodeId = key === 'all' ? userStore.getWorkspaceId() : key
+    const nodeId = key === 'all' ? workspaceId : key
     folderStore.setCurrentFolder({id: nodeId, name: key === 'all' ? '全部' : key === 'share' ? '共享' : key})
     onSelect?.(key === 'all' ? {id: nodeId} : {id: key})
   }
@@ -264,13 +266,19 @@ export default function FolderVirtualizedTree({
 
   return (
     <div style={{flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column'}}>
-      <div style={{display: 'flex', gap: 8, padding: '8px 8px 4px'}}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          padding: '12px 12px 8px',
+        }}
+      >
         <Input
           value={filterText}
           onChange={e => setFilterText(e.target.value)}
           placeholder={t('common.search')}
           allowClear
-          prefix={<SearchOutlined />}
+          prefix={<SearchOutlined style={{color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)'}} />}
           style={{flex: 1}}
           size="small"
         />
@@ -278,27 +286,61 @@ export default function FolderVirtualizedTree({
           <Button size="small" style={{width: 32, padding: 0}} icon={<AppIcon iconName={sortIconName} />} />
         </Dropdown>
       </div>
-      <div style={{flex: 1, minHeight: 0, overflow: 'auto'}}>
+      <div style={{flex: 1, minHeight: 0, overflow: 'auto', padding: '0 8px 8px'}}>
         <Tree
+          className="kb-folder-tree"
           treeData={displayTreeData}
           selectedKeys={selectedKeys}
           onSelect={handleSelect}
           blockNode
           defaultExpandAll
           showIcon
-          style={{padding: '4px 0'}}
+          style={{padding: '4px 0', background: 'transparent'}}
           titleRender={(node: any) => {
             const showContext = canOperation && !node.isRoot && hasAnyFolderPermission(node)
+            const isSelected = selectedKeys[0] === node.key
+            const isHover = hoverNodeId === node.key
+            const bg = isSelected
+              ? 'rgba(22,119,255,0.12)'
+              : isHover
+                ? isDark
+                  ? 'rgba(255,255,255,0.06)'
+                  : 'rgba(0,0,0,0.04)'
+                : 'transparent'
+            const color = isSelected
+              ? '#1677ff'
+              : isDark
+                ? 'rgba(255,255,255,0.85)'
+                : 'rgba(0,0,0,0.65)'
             return (
               <div
                 onMouseEnter={() => handleMouseEnter(node.key)}
                 onMouseLeave={handleMouseLeave}
-                style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 8}}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  background: bg,
+                  color,
+                  transition: 'background 0.15s ease',
+                  cursor: 'pointer',
+                }}
               >
-                <span style={{fontSize: 13, fontWeight: node.isRoot ? 500 : 400, color: node.isRoot ? '#1a1a1a' : '#333'}}>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: node.isRoot || isSelected ? 600 : 400,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {node.icon && <span style={{display: 'inline-flex', color: node.isRoot ? '#1677ff' : 'inherit'}}>{node.icon}</span>}
                   {node.title}
                 </span>
-                {showContext && hoverNodeId === node.key && (
+                {showContext && isHover && (
                   <Dropdown
                     menu={{items: buildContextMenuItems(node), onClick: ({key}) => handleContextMenuClick(node, key)}}
                     trigger={['click']}

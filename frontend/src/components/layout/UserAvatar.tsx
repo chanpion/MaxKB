@@ -46,10 +46,10 @@ export default function UserAvatar() {
       icon: <SettingOutlined />,
       label: '系统管理',
       children: [
-        {key: 'system-user', label: '用户管理', onClick: () => router.push('/system/user')},
-        {key: 'system-role', label: '角色管理', onClick: () => router.push('/system/role')},
-        {key: 'system-workspace', label: '工作区管理', onClick: () => router.push('/system/workspace')},
-        {key: 'system-setting', label: '系统设置', onClick: () => router.push('/system/setting/theme')},
+        {key: 'system-user', label: '用户管理（敬请期待）', disabled: true},
+        {key: 'system-role', label: '角色管理（敬请期待）', disabled: true},
+        {key: 'system-workspace', label: '工作区管理（敬请期待）', disabled: true},
+        {key: 'system-setting', label: '系统设置（敬请期待）', disabled: true},
       ],
     },
     {

@@ -127,7 +127,7 @@ export default function CardBox({
                 </div>
               )}
             </div>
-            {tag && <div style={{flexShrink: 0}}>{tag}</div>}
+            {tag && <div style={{position: 'absolute', right: 16, top: 14, zIndex: 1}}>{tag}</div>}
           </div>
         }
       >
@@ -141,7 +141,7 @@ export default function CardBox({
               WebkitBoxOrient: 'vertical',
               WebkitLineClamp: 2,
               overflow: 'hidden',
-              minHeight: 44,
+              minHeight: 70,
             }}
           >
             {description}
@@ -149,26 +149,25 @@ export default function CardBox({
         )}
         {children}
       </Card>
-      {footer && (
+      {(footer || (mouseEnter && hover)) && (
         <div
           style={{
             position: 'absolute',
             bottom: 8,
-            left: 16,
-            right: 16,
-            height: 30,
+            left: 0,
+            width: '100%',
+            minHeight: 30,
+            padding: '0 16px',
             display: 'flex',
             alignItems: 'center',
-            borderTop: `1px solid ${borderColor}`,
-            paddingTop: 6,
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
           }}
         >
-          {footer}
-        </div>
-      )}
-      {mouseEnter && hover && (
-        <div style={{position: 'absolute', top: 10, right: 10, zIndex: 10}} onClick={(e) => e.stopPropagation()}>
-          {mouseEnter}
+          <div style={{flex: 1}}>{footer}</div>
+          {mouseEnter && hover && (
+            <div onClick={(e) => e.stopPropagation()}>{mouseEnter}</div>
+          )}
         </div>
       )}
     </div>

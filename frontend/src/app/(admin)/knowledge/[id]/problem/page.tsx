@@ -1,17 +1,14 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Table, Button, Space, Typography, Tag, Spin, Modal, Form, Input, message, Popconfirm, Tabs} from 'antd'
-import {HomeOutlined, FileTextOutlined, QuestionCircleOutlined, PlusOutlined, EditOutlined, DeleteOutlined, ExperimentOutlined, BookOutlined, SettingOutlined, UserOutlined} from '@ant-design/icons'
+import {Breadcrumb, Table, Button, Space, Typography, Tag, Spin, Modal, Form, Input, message, Popconfirm} from 'antd'
+import {HomeOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
-import {useRouter, usePathname} from '@/i18n/navigation'
 import {get, post, del} from '@/lib/request'
 import {useUserStore} from '@/store'
 
 function ws() { return useUserStore.getState().getWorkspaceId() }
 
 export default function ProblemPage() {
-  const router = useRouter()
-  const pathname = usePathname()
   const params = useParams()
   const kid = params.id as string
   const [list, setList] = useState<any[]>([])
@@ -28,7 +25,7 @@ export default function ProblemPage() {
 
   const handleCreate = () => {
     form.validateFields().then((values) => {
-      post(`${prefix}`, values).then(() => { message.success('创建成功'); setCreateOpen(false); form.resetFields(); load() }).catch(() => {})
+      post(`${prefix}`, [values.content]).then(() => { message.success('创建成功'); setCreateOpen(false); form.resetFields(); load() }).catch(() => {})
     })
   }
 
@@ -36,24 +33,12 @@ export default function ProblemPage() {
     del(`${prefix}/${id}`).then(() => { message.success('删除成功'); load() }).catch(() => {})
   }
 
-  const tabItems = [
-    {key: 'document', label: <><FileTextOutlined /> 文档</>},
-    {key: 'problem', label: <><QuestionCircleOutlined /> 问题</>},
-    {key: 'termbase', label: <><BookOutlined /> 术语库</>},
-    {key: 'hit-test', label: <><ExperimentOutlined /> 命中测试</>},
-    {key: 'chat-user', label: <><UserOutlined /> 对话用户</>},
-    {key: 'setting', label: <><SettingOutlined /> 设置</>},
-  ]
-
   return (
     <div>
       <Breadcrumb style={{marginBottom: 12}} items={[
         {title: <><HomeOutlined /> 首页</>},
         {title: <><FileTextOutlined /> 知识库详情</>},
       ]} />
-      <Tabs activeKey="problem" items={tabItems}
-        onChange={(key) => router.push(`/knowledge/${kid}/${key}`)}
-        style={{marginBottom: 8}} />
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
         <Typography.Title level={5} style={{margin: 0}}>问题管理</Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建问题</Button>

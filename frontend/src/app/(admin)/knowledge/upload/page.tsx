@@ -2,7 +2,8 @@
 import React, {useState, useRef} from 'react'
 import {Breadcrumb, Card, Button, Typography, Steps, Upload, message, Spin, Divider, Alert} from 'antd'
 import {HomeOutlined, FileTextOutlined, UploadOutlined, ArrowLeftOutlined, CheckCircleOutlined, InboxOutlined} from '@ant-design/icons'
-import {useRouter, useSearchParams} from '@/i18n/navigation'
+import {useRouter} from '@/i18n/navigation'
+import {useSearchParams} from 'next/navigation'
 import {useUserStore} from '@/store'
 import {post} from '@/lib/request'
 

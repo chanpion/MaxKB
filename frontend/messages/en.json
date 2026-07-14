@@ -66,6 +66,7 @@
     "confirm": "Confirm",
     "name": "Name",
     "desc": "Description",
+    "creator": "Creator",
     "search": "Search",
     "searchBar": {
       "placeholder": "Search"

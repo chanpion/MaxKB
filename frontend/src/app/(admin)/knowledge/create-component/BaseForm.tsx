@@ -27,10 +27,17 @@ const KnowledgeBaseForm = forwardRef<KnowledgeBaseFormRef, {}>(function Knowledg
   }))
 
   useEffect(() => {
+    // 注意：不能用 /knowledge/model（Django 视图漏传 user_id，会返回 code 500
+    // 「用户 ID:该字段是必填项」）。改用与旧版 ui 同款的 /model_list 端点，
+    // 并只取 EMBEDDING 类型模型（本表单字段为 embedding_model_id）。
     knowledgeApi
-      .getKnowledgeModel()
+      .getKnowledgeEmbeddingModel()
       .then((ok: any) => {
-        const list = (ok.data || []).map((m: any) => ({label: m.name, value: m.id}))
+        const inner = ok?.data || {}
+        const list = [...(inner.shared_model || []), ...(inner.model || [])].map((m: any) => ({
+          label: m.name,
+          value: m.id,
+        }))
         setModelOptions(list)
       })
       .catch(() => setModelOptions([]))

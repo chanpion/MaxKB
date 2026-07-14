@@ -66,6 +66,7 @@
     "confirm": "确定",
     "name": "名称",
     "desc": "描述",
+    "creator": "创建人",
     "search": "搜索",
     "searchBar": {
       "placeholder": "搜索"

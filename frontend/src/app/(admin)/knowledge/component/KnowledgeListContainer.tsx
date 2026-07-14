@@ -1,14 +1,14 @@
 'use client'
 import React, {useEffect, useRef, useState} from 'react'
-import {Row, Col, Input, Select, Dropdown, Button, Empty, Checkbox, Tag, Upload, message} from 'antd'
-import {MoreOutlined} from '@ant-design/icons'
+import {Row, Col, Input, Select, Dropdown, Button, Empty, Checkbox, message, Divider} from 'antd'
+import {MoreOutlined, DownOutlined} from '@ant-design/icons'
 import {useRouter} from '@/i18n/navigation'
 import CardBox from '@/components/CardBox'
 import KnowledgeIcon from '@/components/KnowledgeIcon'
 import InfiniteScroll from '@/components/InfiniteScroll'
 import AppIcon from '@/components/AppIcon'
 import permissionMap from '@/permission'
-import {useFolderStore, useUserStore, useKnowledgeStore} from '@/store'
+import {useFolderStore, useUserStore, useKnowledgeStore, useThemeStore} from '@/store'
 import {loadSharedApi} from '@/lib/api/shared-api'
 import knowledgeApi from '@/lib/api/knowledge/knowledge'
 import {loginApi} from '@/lib/api/login'
@@ -47,7 +47,10 @@ export default function KnowledgeListContainer() {
   const [isBatch, setIsBatch] = useState(false)
   const [multipleSelection, setMultipleSelection] = useState<any[]>([])
   const [sortField, setSortField] = useState<string>('create_time')
+  const [searchType, setSearchType] = useState<'name' | 'create_user'>('name')
   const [userOptions, setUserOptions] = useState<any[]>([])
+  const isDark = useThemeStore((s) => s.isDark)
+  const borderColor = isDark ? '#424242' : '#d9d9d9'
 
   const [currentCreateDialog, setCurrentCreateDialog] = useState<React.ReactElement | null>(null)
   const [currentFolder, setCurrentFolder] = useState<any>(null)
@@ -72,8 +75,8 @@ export default function KnowledgeListContainer() {
       folder_id: folder.currentFolder?.id || user.getWorkspaceId(),
       scope: 'WORKSPACE',
     }
-    if (searchForm.name) params.name = searchForm.name
-    if (searchForm.create_user) params.create_user = searchForm.create_user
+    if (searchType === 'name' && searchForm.name) params.name = searchForm.name
+    if (searchType === 'create_user' && searchForm.create_user) params.create_user = searchForm.create_user
     if (sortField) params.order = sortField
     knowledgeApi
       .getKnowledgeList(params)
@@ -177,7 +180,7 @@ export default function KnowledgeListContainer() {
       .catch(() => {})
   }
 
-  const handleImport = (file: any) => {
+  const handleImport = (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('folder_id', folder.currentFolder?.id || user.getWorkspaceId())
@@ -189,7 +192,6 @@ export default function KnowledgeListContainer() {
         refresh()
       })
       .catch(() => {})
-    return false
   }
 
   const menuItems = (row: any) => {
@@ -231,17 +233,26 @@ export default function KnowledgeListContainer() {
     3: '#13c2c2',
   }
 
+  const importUploadRef = useRef<HTMLInputElement>(null)
+
+  const handleTriggerImport = () => {
+    importUploadRef.current?.click()
+  }
+
   const createDropdownItems = [
     {key: 'general', label: t('views.knowledge.knowledgeType.generalKnowledge')},
     {key: 'web', label: t('views.knowledge.knowledgeType.webKnowledge')},
     ENABLE_LARK && {key: 'lark', label: t('views.knowledge.knowledgeType.larkKnowledge')},
     {key: 'workflow', label: t('views.knowledge.knowledgeType.workflowKnowledge')},
+    {type: 'divider' as const},
+    {key: 'import', label: t('common.importCreate')},
+    {type: 'divider' as const},
     {key: 'folder', label: t('components.folder.addFolder')},
   ].filter(Boolean) as any[]
 
   return (
     <div style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap'}}>
+      <div style={{display: 'flex', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap'}}>
         <Select
           value={sortField}
           onChange={setSortField}
@@ -252,44 +263,59 @@ export default function KnowledgeListContainer() {
             {label: '名称 Z-A', value: 'name_desc'},
           ]}
         />
-        <Input
-          value={searchForm.name}
-          allowClear
-          onChange={(e) => setSearchForm((s) => ({...s, name: e.target.value}))}
-          onPressEnter={onSearch}
-          placeholder={t('common.searchBar.placeholder')}
-          style={{width: 200}}
-        />
-        <Select
-          showSearch
-          allowClear
-          value={searchForm.create_user}
-          onChange={(v) => setSearchForm((s) => ({...s, create_user: v}))}
-          placeholder="创建人"
-          style={{width: 130}}
-          filterOption={false}
-          onSearch={(val) => {
-            if (val) loginApi.getUserList({name: val}).then((res: any) => setUserOptions(res.data || []))
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'stretch',
+            height: 32,
+            border: `1px solid ${borderColor}`,
+            borderRadius: 6,
+            overflow: 'hidden',
+            background: isDark ? '#1f1f1f' : '#fff',
           }}
-          options={userOptions.map((u: any) => ({label: u.nick_name || u.username, value: u.id}))}
-        />
-        {!isBatch ? (
-          <>
-            <Dropdown
-              menu={{
-                items: createDropdownItems,
-                onClick: ({key}) => {
-                  if (key === 'folder') createFolderRef.current?.open(SourceTypeEnum.KNOWLEDGE, folder.currentFolder?.id)
-                  else openCreateDialog(key)
-                },
+        >
+          <Select
+            value={searchType}
+            onChange={(v) => {
+              setSearchType(v)
+              setSearchForm({name: '', create_user: undefined})
+            }}
+            variant="borderless"
+            style={{width: 90}}
+            options={[
+              {label: t('common.creator'), value: 'create_user'},
+              {label: t('common.name'), value: 'name'},
+            ]}
+          />
+          {searchType === 'name' ? (
+            <Input
+              value={searchForm.name}
+              onChange={(e) => setSearchForm((s) => ({...s, name: e.target.value}))}
+              onPressEnter={onSearch}
+              placeholder={t('common.searchBar.placeholder')}
+              variant="borderless"
+              allowClear
+              style={{width: 190, borderLeft: `1px solid ${borderColor}`}}
+            />
+          ) : (
+            <Select
+              showSearch
+              allowClear
+              value={searchForm.create_user}
+              onChange={(v) => setSearchForm((s) => ({...s, create_user: v}))}
+              placeholder={t('common.creator')}
+              variant="borderless"
+              style={{width: 190, borderLeft: `1px solid ${borderColor}`}}
+              filterOption={false}
+              onSearch={(val) => {
+                if (val) loginApi.getUserList({name: val}).then((res: any) => setUserOptions(res.data || []))
               }}
-            >
-              <Button type="primary">{t('common.create')}</Button>
-            </Dropdown>
-            <Upload beforeUpload={handleImport} showUploadList={false} accept=".zip">
-              <Button>{t('common.importCreate')}</Button>
-            </Upload>
-          </>
+              options={userOptions.map((u: any) => ({label: u.nick_name || u.username, value: u.id}))}
+            />
+          )}
+        </div>
+        {!isBatch ? (
+          <Button onClick={() => batchSelectedHandle(true)}>{t('views.paragraph.setting.batchSelected')}</Button>
         ) : (
           <Button onClick={() => batchSelectedHandle(false)}>{t('views.paragraph.setting.cancelSelected')}</Button>
         )}
@@ -303,12 +329,35 @@ export default function KnowledgeListContainer() {
             {t('common.delete')}
           </Button>
         )}
-        <span style={{color: 'rgba(0,0,0,0.45)', marginLeft: 'auto'}}>
+        <span style={{color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)', fontSize: 13}}>
           {t('common.selected')} {multipleSelection.length}/{pagination.total}
         </span>
-        <Button onClick={() => batchSelectedHandle(!isBatch)} style={{marginLeft: 8}}>
-          {isBatch ? t('views.paragraph.setting.cancelSelected') : t('views.paragraph.setting.batchSelected')}
-        </Button>
+        <Dropdown
+          menu={{
+            items: createDropdownItems,
+            onClick: ({key}) => {
+              if (key === 'import') handleTriggerImport()
+              else if (key === 'folder') createFolderRef.current?.open(SourceTypeEnum.KNOWLEDGE, folder.currentFolder?.id)
+              else openCreateDialog(key)
+            },
+          }}
+        >
+          <Button type="primary" style={{marginLeft: 'auto'}}>
+            {t('common.create')}
+            <DownOutlined style={{marginLeft: 4}} />
+          </Button>
+        </Dropdown>
+        <input
+          ref={importUploadRef}
+          type="file"
+          accept=".zip"
+          style={{display: 'none'}}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) handleImport(file)
+            e.target.value = ''
+          }}
+        />
       </div>
 
       <InfiniteScroll
@@ -323,9 +372,9 @@ export default function KnowledgeListContainer() {
           <Empty description={t('common.noData')} />
         ) : (
           <Checkbox.Group value={multipleSelection} onChange={setMultipleSelection}>
-            <Row gutter={[16, 16]}>
+            <Row gutter={[15, 15]}>
               {knowledge.knowledgeList.map((item: any) => (
-                <Col key={item.id} xs={24} sm={12} md={12} lg={8} xl={8}>
+                <Col key={item.id} xs={24} sm={12} md={12} lg={8} xl={6}>
                   <CardBox
                     accent={KB_ACCENT[item.type ?? 0]}
                     icon={<KnowledgeIcon type={item.type} />}
@@ -342,21 +391,26 @@ export default function KnowledgeListContainer() {
                     tag={
                       isBatch ? (
                         <Checkbox value={item.id} />
-                      ) : item.type === 1 ? (
-                        <Tag color="purple" style={{borderRadius: 6, marginInlineEnd: 0}}>WEB</Tag>
                       ) : null
                     }
                     footer={
-                      <div style={{display: 'flex', alignItems: 'center', gap: 14, fontSize: 12}}>
-                        <span style={{display: 'inline-flex', alignItems: 'baseline', gap: 4}}>
-                          <span style={{fontWeight: 700, fontSize: 14}}>{item?.document_count || 0}</span>
-                          <span style={{opacity: 0.55}}>{t('views.knowledge.document_count')}</span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontSize: 12,
+                          color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+                        }}
+                      >
+                        <span style={{fontWeight: 700, fontSize: 14, color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)'}}>
+                          {item?.document_count || 0}
                         </span>
-                        <span style={{opacity: 0.25}}>|</span>
-                        <span style={{display: 'inline-flex', alignItems: 'baseline', gap: 4}}>
-                          <span style={{fontWeight: 700, fontSize: 14}}>{numberFormat(item?.char_length)}</span>
-                          <span style={{opacity: 0.55}}>{t('common.character')}</span>
+                        <span style={{marginLeft: 4}}>{t('views.knowledge.document_count')}</span>
+                        <Divider type="vertical" style={{margin: '0 12px'}} />
+                        <span style={{fontWeight: 700, fontSize: 14, color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)'}}>
+                          {numberFormat(item?.char_length)}
                         </span>
+                        <span style={{marginLeft: 4}}>{t('common.character')}</span>
                       </div>
                     }
                     mouseEnter={

@@ -35,10 +35,12 @@ export const useUserStore = create<UserStore>((set, get) => ({
   userInfo: null,
   workspace_id: '',
   rsaKey: null,
-  // RSA 公钥由后端公开端点 /system/profile 的 data.rsa 提供（无需登录）。
-  // 注意：/user/profile 需要已登录 token 且不返回 rsa，不能用于登录前取公钥。
+  // RSA 公钥由后端公开端点 /profile 的 data.rsa 提供（无需登录）。
+  // 注意：该路径同时兼容原 Django 后端（/admin/api/profile）与 FastAPI 重构后端
+  // （/admin/api/profile 经 path_rewrite 重写为 /api/system/profile），请勿改回 /system/profile。
+  // /user/profile 需要已登录 token 且不返回 rsa，不能用于登录前取公钥。
   fetchRsa: () => {
-    return httpGet('/system/profile').then((res: any) => {
+    return httpGet('/profile').then((res: any) => {
       const key = res?.data?.rsa ?? res?.rsa ?? null
       set({rsaKey: key})
       return key

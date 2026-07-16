@@ -5,19 +5,21 @@ from __future__ import annotations
 import json
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.security import create_access_token
+from app.models.base import uuid7
 from app.models.application import (
     Application,
     ApplicationAccessToken,
     ApplicationKnowledgeMapping,
     Chat,
     ChatRecord,
+    ChatShareLink,
 )
 from app.models.models_provider import Model
 from app.models.system import ChatUser
@@ -450,6 +452,199 @@ async def delete_conversation(
     if chat is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
     chat.is_deleted = True
+    await session.commit()
+    return {"result": True}
+
+
+# ---------------------------------------------------------------------------
+# Embed component + MCP protocol entry
+# ---------------------------------------------------------------------------
+
+
+@router.get("/embed")
+async def chat_embed(
+    token: str = Query(..., alias="access_token"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Embedded chat widget configuration.
+
+    Mirrors Django ``chat/embed``: returns the application profile plus the
+    access-token display settings so the embeddable iframe can render the chat
+    component. Reuses the ``/application/profile`` payload shape.
+    """
+    result = await session.execute(
+        select(ApplicationAccessToken).where(
+            ApplicationAccessToken.access_token == token,
+            ApplicationAccessToken.is_active == True,  # noqa: E712
+        )
+    )
+    access_token_row = result.scalar_one_or_none()
+    if access_token_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+
+    application = await session.get(Application, access_token_row.application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    return {
+        "id": str(application.id),
+        "name": application.name,
+        "icon": application.icon,
+        "authentication": access_token_row.authentication,
+        "authentication_value": access_token_row.authentication_value,
+        "show_source": access_token_row.show_source,
+        "show_exec": access_token_row.show_exec,
+        "type": application.type,
+        "prologue": application.prologue,
+    }
+
+
+@router.get("/mcp")
+async def mcp_info() -> dict:
+    """MCP protocol entry — server capabilities (GET probe)."""
+    return {
+        "protocolVersion": "2024-11-05",
+        "capabilities": {"tools": {"listChanged": False}},
+        "serverInfo": {"name": "maxkb", "version": "1.0.0"},
+    }
+
+
+@router.post("/mcp")
+async def mcp_entry(body: dict, session: AsyncSession = Depends(get_session)) -> dict:
+    """MCP JSON-RPC entry point (best-effort subset).
+
+    Handles ``initialize`` and ``tools/list`` so MCP clients can discover the
+    application's tools. Full MCP tool invocation is delegated to the workflow /
+    tool engine; this endpoint provides protocol-level compatibility.
+    """
+    method = body.get("method")
+    msg_id = body.get("id")
+
+    if method == "initialize":
+        return {
+            "jsonrpc": "2.0",
+            "id": msg_id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": {"name": "maxkb", "version": "1.0.0"},
+            },
+        }
+    if method == "tools/list":
+        return {
+            "jsonrpc": "2.0",
+            "id": msg_id,
+            "result": {"tools": []},
+        }
+    if method == "ping":
+        return {"jsonrpc": "2.0", "id": msg_id, "result": {}}
+    return {
+        "jsonrpc": "2.0",
+        "id": msg_id,
+        "error": {"code": -32601, "message": f"method not found: {method}"},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Share links
+# ---------------------------------------------------------------------------
+
+
+@router.post("/share", status_code=status.HTTP_201_CREATED)
+async def create_share_link(
+    body: dict,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Create a shareable chat link (mirrors Django ``share``)."""
+    access_token = body.get("access_token") or body.get("token")
+    if access_token:
+        token_row = (
+            await session.execute(
+                select(ApplicationAccessToken).where(ApplicationAccessToken.access_token == access_token)
+            )
+        ).scalar_one_or_none()
+        application_id = token_row.application_id if token_row else None
+    else:
+        application_id = body.get("application_id")
+
+    if application_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="application_id or access_token required")
+
+    link_id = str(uuid7())
+    share = ChatShareLink(
+        id=link_id,
+        chat_id=body.get("chat_id"),
+        application_id=application_id,
+        share_type=body.get("share_type", "PUBLIC"),
+        chat_record_ids=body.get("chat_record_ids", []),
+    )
+    session.add(share)
+    await session.commit()
+    return {"id": link_id, "share_type": share.share_type}
+
+
+@router.get("/share/{link}")
+async def get_share_link(
+    link: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Retrieve a shared chat (application profile + shared records)."""
+    share = await session.get(ChatShareLink, link)
+    if share is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Share link not found")
+
+    application = await session.get(Application, share.application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    records: list[dict] = []
+    if share.chat_record_ids:
+        result = await session.execute(
+            select(ChatRecord).where(ChatRecord.id.in_(share.chat_record_ids)).order_by(ChatRecord.create_time.asc())
+        )
+        records = [ChatRecordOut.model_validate(r).model_dump() for r in result.scalars().all()]
+
+    return {
+        "id": str(share.id),
+        "application": {
+            "id": str(application.id),
+            "name": application.name,
+            "icon": application.icon,
+            "prologue": application.prologue,
+        },
+        "records": records,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Clear history
+# ---------------------------------------------------------------------------
+
+
+@router.post("/historical_conversation/clear")
+async def clear_conversations(
+    token: str = Query(..., alias="access_token"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Clear (soft-delete) all historical conversations for the application.
+
+    Mirrors Django ``historical_conversation/clear``.
+    """
+    result = await session.execute(
+        select(ApplicationAccessToken).where(
+            ApplicationAccessToken.access_token == token,
+            ApplicationAccessToken.is_active == True,  # noqa: E712
+        )
+    )
+    access_token_row = result.scalar_one_or_none()
+    if access_token_row is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid access token")
+
+    await session.execute(
+        Chat.__table__.update()
+        .where(Chat.application_id == access_token_row.application_id)
+        .values(is_deleted=True)
+    )
     await session.commit()
     return {"result": True}
 

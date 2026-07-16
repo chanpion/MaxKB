@@ -55,17 +55,23 @@ class AgnoRetriever:
         self._retriever = PgVectorRetriever()
 
     async def arun(self, query: str, **kwargs: Any) -> list[dict[str, Any]]:
-        provider = self.embedding["provider"]
-        model_name = self.embedding["model_name"]
-        credential = self.embedding.get("credential", {})
-        dimensions = self.embedding.get("dimensions")
-        vectors = await embed_texts(
-            provider, model_name, credential, [normalize_for_embedding(query)], dimensions=dimensions
-        )
-        if not vectors:
-            return []
+        query_embedding = None
+        if self.search_mode != "keywords":
+            # Keyword-only search does not need a query embedding.
+            if self.embedding is None:
+                return []
+            provider = self.embedding["provider"]
+            model_name = self.embedding["model_name"]
+            credential = self.embedding.get("credential", {})
+            dimensions = self.embedding.get("dimensions")
+            vectors = await embed_texts(
+                provider, model_name, credential, [normalize_for_embedding(query)], dimensions=dimensions
+            )
+            if not vectors:
+                return []
+            query_embedding = vectors[0]
         rows = await self._retriever.search(
-            query_embedding=vectors[0],
+            query_embedding=query_embedding,
             knowledge_ids=self.knowledge_ids,
             top_n=self.top_n,
             similarity=self.similarity,

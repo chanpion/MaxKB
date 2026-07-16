@@ -93,6 +93,8 @@ class ApplicationVersion(AppTableBase, table=True):
     __tablename__ = "application_version"
     id: UUID = Field(default_factory=uuid.uuid7, primary_key=True)
     application_id: UUID
+    workspace_id: str = Field(default="default", max_length=64, index=True)
+    application_name: str = Field(default="", max_length=128)
     name: str = Field(default="", max_length=128)
     desc: str = Field(default="", max_length=512)
     publish_user_id: UUID | None = Field(default=None)

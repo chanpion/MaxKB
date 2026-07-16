@@ -47,11 +47,13 @@ from app.workflows.nodes.tool_start import ToolStartNode
 from app.workflows.nodes.tool_workflow import ToolWorkflowNode
 from app.workflows.nodes.variable_aggregate import VariableAggregateNode
 from app.workflows.nodes.variable_assign import VariableAssignNode
+from app.workflows.modes import DEFAULT_WORKFLOW_MODE, NODE_SUPPORT, WorkflowMode
 from app.workflows.nodes.variable_split import VariableSplitNode
 from app.workflows.nodes.video_understand import VideoUnderstandNode
 
-# All 36 node types (aligned with the legacy Django workflow engine).
-node_map: dict[str, type[StepNode]] = {
+# Flat registry of every node class keyed by its ``type`` (36 types, aligned
+# with the legacy Django workflow engine).
+_node_registry: dict[str, type[StepNode]] = {
     # --- Stage 7 base set (12) ---
     StartNode.type: StartNode,
     QuestionNode.type: QuestionNode,
@@ -96,12 +98,57 @@ node_map: dict[str, type[StepNode]] = {
 }
 
 # Legacy ``reply-node`` alias (backend used ``direct-reply-node``).
-node_map["reply-node"] = DirectReplyNode
+_node_registry["reply-node"] = DirectReplyNode
+
+
+def _build_nested_node_map() -> dict[str, dict[WorkflowMode, type[StepNode]]]:
+    """Build ``{type: {workflow_mode: node_cls}}`` mirroring Django.
+
+    Each type expands into one entry per mode in its ``support`` list (see
+    :data:`app.workflows.modes.NODE_SUPPORT`), exactly like the legacy
+    ``node_map = {n.type: {w: n for w in n.support} ...}``.
+    """
+    nested: dict[str, dict[WorkflowMode, type[StepNode]]] = {}
+    for node_type, node_cls in _node_registry.items():
+        if node_type == "reply-node":
+            # Alias inherits the direct-reply-node support.
+            supported = NODE_SUPPORT.get(DirectReplyNode.type, [DEFAULT_WORKFLOW_MODE])
+        else:
+            supported = NODE_SUPPORT.get(node_type, [DEFAULT_WORKFLOW_MODE])
+        nested[node_type] = {mode: node_cls for mode in supported}
+    return nested
+
+
+# Nested node map: ``node_map[type][mode] -> StepNode subclass``.
+node_map: dict[str, dict[WorkflowMode, type[StepNode]]] = _build_nested_node_map()
 
 
 def register_node(node_cls: type[StepNode]) -> None:
-    node_map[node_cls.type] = node_cls
+    _node_registry[node_cls.type] = node_cls
+    node_map[node_cls.type] = {
+        mode: node_cls for mode in NODE_SUPPORT.get(node_cls.type, [DEFAULT_WORKFLOW_MODE])
+    }
 
 
-def get_node(node_type: str) -> type[StepNode] | None:
-    return node_map.get(node_type)
+def get_node(
+    node_type: str,
+    workflow_mode: WorkflowMode | str | None = None,
+) -> type[StepNode] | None:
+    """Resolve a node class for ``node_type`` under ``workflow_mode``.
+
+    Falls back to the default mode when ``workflow_mode`` is ``None`` (keeps the
+    legacy single-argument call sites working), and to the first supported mode
+    if a specific mode is requested but the type does not list it (graceful
+    degradation rather than a hard failure for partially-aligned flows).
+    """
+    nested = node_map.get(node_type)
+    if not nested:
+        return None
+    if workflow_mode is None:
+        workflow_mode = DEFAULT_WORKFLOW_MODE
+    if isinstance(workflow_mode, str):
+        try:
+            workflow_mode = WorkflowMode(workflow_mode)
+        except ValueError:
+            workflow_mode = DEFAULT_WORKFLOW_MODE
+    return nested.get(workflow_mode) or next(iter(nested.values()), None)

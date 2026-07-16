@@ -20,13 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import engine
 from app.models.base import uuid7
-from app.models.knowledge import Document, Paragraph
+from app.models.knowledge import Document, Paragraph, Termbase
 from app.rag.embed import (
     chunk_text,
     embed_texts,
     normalize_for_embedding,
     sub_array,
+    to_ts_vector,
 )
+from sqlalchemy import select
 from app.rag.parsers import ParsedDocument, parse_file
 from app.rag.splitter import split_text
 
@@ -171,6 +173,15 @@ async def _embed_paragraphs(
             flat_texts.append(t)
             owner.append(para)
 
+    # User dictionary (Termbase) injection: Django builds the tsvector with the
+    # knowledge base's Termbase words added to jieba so proper nouns are tokenised
+    # correctly. We mirror that here by passing the terms to ``to_ts_vector``.
+    terms = (
+        await session.execute(
+            select(Termbase.content).where(Termbase.knowledge_id == knowledge_id)
+        )
+    ).scalars().all()
+
     if flat_texts:
         normalized = [normalize_for_embedding(t) for t in flat_texts]
         vectors = await embed_texts(provider, model_name, credential, normalized, dimensions=dimensions)
@@ -191,7 +202,7 @@ async def _embed_paragraphs(
                             "document_id": str(document_id),
                             "paragraph_id": str(para.id),
                             "embedding": "[" + ",".join(str(float(x)) for x in vectors[i]) + "]",
-                            "search_text": flat_texts[i],
+                            "search_text": to_ts_vector(flat_texts[i], user_words=list(terms)),
                             "meta": "{}",
                         },
                     )

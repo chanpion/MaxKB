@@ -163,3 +163,21 @@ class File(AppTableBase, table=True):
     source_id: str = Field(default="TEMPORARY_120_MINUTE", max_length=256, index=True)
     loid: int = Field(default=0)
     meta: dict = Field(default={}, sa_column=Column(JSONB))
+
+
+class KnowledgeAction(AppTableBase, table=True):
+    """Async knowledge-base action state (mirrors ``KnowledgeAction``).
+
+    Tracks the lifecycle of long-running knowledge operations (migration,
+    sync, batch import). ``state`` mirrors the Django ``State`` TextChoices
+    (PENDING / STARTED / SUCCESS / FAILURE / REVOKE / REVOKED) and defaults to
+    STARTED, exactly like the legacy model.
+    """
+
+    __tablename__ = "knowledge_action"
+    id: UUID = Field(default_factory=uuid.uuid7, primary_key=True)
+    knowledge_id: UUID
+    state: str = Field(default="STARTED", max_length=20)
+    details: dict = Field(default={}, sa_column=Column(JSONB))
+    run_time: float = Field(default=0)
+    meta: dict = Field(default={}, sa_column=Column(JSONB))

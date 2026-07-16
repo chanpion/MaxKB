@@ -117,19 +117,47 @@ def get_level_block(text: str, level_content_list: list[dict[str, Any]], index: 
 
 
 def smart_split_paragraph(content: str, limit: int) -> list[str]:
+    """Split ``content`` into chunks of at most ``limit`` characters.
+
+    Mirrors ``common/utils/split_model.smart_split_paragraph`` exactly: when a
+    chunk would exceed ``limit``, we back-track from the limit boundary to the
+    nearest sentence-ending character (Chinese/English period, exclamation or
+    question mark) so chunk boundaries land on natural sentence breaks. This
+    keeps the same paragraph boundaries as the Django backend, which matters
+    for retrieval quality.
+    """
+    if len(content) <= limit:
+        return [content]
+
     result: list[str] = []
-    temp_char, start = "", 0
-    while (pos := content.find("\n", start)) != -1:
-        split, start = content[start : pos + 1], pos + 1
-        if len(temp_char + split) > limit:
-            result.append(temp_char)
-            temp_char = ""
-        temp_char = temp_char + split
-    temp_char = temp_char + content[start:]
-    if len(temp_char) > 0:
-        result.append(temp_char)
-    pattern = r"[\S\s]{1," + str(limit) + "}"
-    return [r for row in result for r in re.findall(pattern, row)]
+    start = 0
+
+    while start < len(content):
+        end = start + limit
+
+        if end >= len(content):
+            # Remaining text fits within the limit — append as-is.
+            result.append(content[start:])
+            break
+
+        # Find the best split point within [start + limit//2, end) by scanning
+        # backwards from ``end`` for a sentence-ending character (priority:
+        # period > exclamation/question, both Chinese and English).
+        best_split = end
+        split_chars = ("。", ".", "！", "!", "？", "?")
+        for i in range(end - 1, start + limit // 2, -1):
+            if content[i] in split_chars:
+                best_split = i + 1  # include the separator in the current chunk
+                break
+
+        # No natural break found: fall back to the hard limit.
+        if best_split == end and end < len(content):
+            best_split = end
+
+        result.append(content[start:best_split])
+        start = best_split
+
+    return [text for text in result if text.strip()]
 
 
 def result_tree_to_paragraph(

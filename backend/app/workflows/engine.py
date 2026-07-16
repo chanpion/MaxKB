@@ -20,6 +20,7 @@ import asyncio
 import json
 from typing import Any
 
+from app.workflows.modes import DEFAULT_WORKFLOW_MODE, WorkflowMode
 from app.workflows.nodes import get_node
 from app.workflows.nodes.base import NodeResult, StepNode
 from app.workflows.state import WorkflowState, serialize
@@ -50,6 +51,15 @@ class WorkflowEngine:
         self.params.setdefault("embedding_config", embedding_config or {})
         self.nodes = {n["id"]: n for n in flow.get("nodes", [])}
         self.edges = flow.get("edges", [])
+        # The flow declares which mode it runs in (application / knowledge /
+        # tool, optionally looped). This mirrors Django's
+        # ``WorkflowManage.flow.workflow_mode`` and selects the right node
+        # implementation via the nested node registry.
+        raw_mode = flow.get("workflow_mode", DEFAULT_WORKFLOW_MODE.value)
+        try:
+            self.workflow_mode: WorkflowMode = WorkflowMode(raw_mode)
+        except ValueError:
+            self.workflow_mode = DEFAULT_WORKFLOW_MODE
         self.node_names = {
             nid: (n.get("properties", {}) or {}).get("stepName", n.get("type", "")) for nid, n in self.nodes.items()
         }
@@ -79,7 +89,7 @@ class WorkflowEngine:
 
     def _make_node(self, node_id: str, up_node_id_list: list[str]) -> StepNode:
         node = self.nodes[node_id]
-        cls = get_node(node.get("type"))
+        cls = get_node(node.get("type"), self.workflow_mode)
         if cls is None:
             raise RuntimeError(f"unsupported node type: {node.get('type')}")
         return cls(node, self.state, up_node_id_list)

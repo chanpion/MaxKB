@@ -7,6 +7,7 @@ a 2048-bit key is generated and persisted.
 from __future__ import annotations
 
 import base64
+from datetime import datetime
 from functools import lru_cache
 
 from Crypto.Cipher import PKCS1_v1_5 as PKCS1_cipher
@@ -40,7 +41,12 @@ async def get_or_create_key_pair(session: AsyncSession) -> dict:
     setting = result.scalar_one_or_none()
     if setting is None:
         kv = _generate_key_pair()
-        setting = SystemSetting(type=RSA_SETTING_TYPE, meta=kv)
+        setting = SystemSetting(
+            type=RSA_SETTING_TYPE,
+            meta=kv,
+            create_time=datetime.now(),
+            update_time=datetime.now(),
+        )
         session.add(setting)
         await session.commit()
         await session.refresh(setting)

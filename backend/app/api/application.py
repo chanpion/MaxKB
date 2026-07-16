@@ -113,6 +113,40 @@ async def get_application(
     return ApplicationOut.model_validate(application)
 
 
+@router.post("/{application_id}/open", response_model=dict)
+async def open_application(
+    application_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    """Open an application — create a fresh debug chat session for it.
+
+    Mirrors Django ``application/<id>/open`` which returns a temporary
+    ``chat_user_id`` for the debug/embedded chat panel. We create a ``Chat``
+    row (the backend's session object) so the frontend can immediately start a
+    conversation against the application.
+    """
+    application = await session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    chat = Chat(
+        application_id=application.id,
+        abstract="新对话",
+        chat_user_type="ANONYMOUS_USER",
+    )
+    session.add(chat)
+    await session.commit()
+    await session.refresh(chat)
+    return {
+        "id": str(chat.id),
+        "application_id": str(application.id),
+        "chat_user_id": str(chat.id),
+        "chat_user_type": "ANONYMOUS_USER",
+        "debug": True,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Create
 # ---------------------------------------------------------------------------
@@ -222,9 +256,12 @@ async def publish_application(
     version_name = now.strftime("%Y-%m-%d %H:%M:%S")
     version = ApplicationVersion(
         application_id=application.id,
+        workspace_id=application.workspace_id,
+        application_name=application.name,
         name=version_name,
         publish_user_id=current_user.id,
         publish_user_name=current_user.username,
+        user_id=current_user.id,
         desc=application.desc,
         prologue=application.prologue,
         dialogue_number=application.dialogue_number,

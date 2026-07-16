@@ -49,6 +49,19 @@ ORDER BY similarity DESC
 LIMIT $5
 """
 
+# Keyword search (mirrors Django ``KeywordsSearch``): pure tsvector match on the
+# ``search_vector`` column, ranked by ``ts_rank_cd``. No embedding vector needed.
+_SQL_KEYWORDS = """
+SELECT e.id AS embedding_id, p.id AS paragraph_id, p.content, p.title,
+       ts_rank_cd(e.search_vector, websearch_to_tsquery('simple', $6)) AS similarity
+FROM embedding e
+JOIN paragraph p ON p.id = e.paragraph_id
+WHERE e.knowledge_id::text = ANY($5::text[]) AND e.is_active = TRUE
+  AND e.search_vector @@ websearch_to_tsquery('simple', $6)
+ORDER BY similarity DESC
+LIMIT $4
+"""
+
 
 class PgVectorRetriever:
     """Custom retriever compatible with Agno Agent's `retriever` interface.
@@ -63,22 +76,44 @@ class PgVectorRetriever:
 
     async def search(
         self,
-        query_embedding: Sequence[float],
+        query_embedding: Sequence[float] | None,
         knowledge_ids: Sequence[str],
         top_n: int = 5,
         similarity: float = 0.5,
         search_mode: str = "embedding",
         query_text: str | None = None,
     ) -> list[dict[str, Any]]:
-        dim = len(query_embedding)
-        vec = json.dumps(list(query_embedding))
         kids = list(knowledge_ids)
-        if search_mode == "blend":
+
+        if search_mode == "keywords":
+            # Pure keyword match — embedding vector is not required.
+            sql = _SQL_KEYWORDS
+            params = (top_n, similarity, top_n, top_n, kids, query_text or "")
+        elif search_mode == "blend":
+            if query_embedding is None:
+                raise ValueError("blend search requires a query embedding")
             sql = _SQL_BLEND
-            params = (dim, vec, top_n, similarity, top_n, kids, query_text or "")
+            params = (
+                len(query_embedding),
+                json.dumps(list(query_embedding)),
+                top_n,
+                similarity,
+                top_n,
+                kids,
+                query_text or "",
+            )
         else:
+            if query_embedding is None:
+                raise ValueError("embedding search requires a query embedding")
             sql = _SQL_EMBEDDING
-            params = (dim, vec, top_n, similarity, top_n, kids)
+            params = (
+                len(query_embedding),
+                json.dumps(list(query_embedding)),
+                top_n,
+                similarity,
+                top_n,
+                kids,
+            )
 
         async with self._engine.connect() as conn:
             result = await conn.exec_driver_sql(sql, params)

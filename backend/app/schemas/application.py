@@ -219,6 +219,8 @@ class AccessTokenOut(SQLModel):
 class ApplicationVersionOut(SQLModel):
     id: uuid.UUID
     application_id: uuid.UUID
+    workspace_id: str = "default"
+    application_name: str = ""
     name: str = ""
     desc: str = ""
     publish_user_id: uuid.UUID | None = None

@@ -1,19 +1,21 @@
 'use client'
-import React, {forwardRef, useImperativeHandle, useState} from 'react'
-import {Drawer, Table, Switch, Button, message, Typography} from 'antd'
+import React, {forwardRef, useImperativeHandle, useState, useEffect} from 'react'
+import {Drawer, Table, Typography, Tag, Empty, Spin, message} from 'antd'
 import {useTranslations} from 'next-intl'
+import {systemApi} from '@/lib/api/system'
 
 export interface WorkspaceAuthorizationDrawerRef {
   open: (resourceId: string) => void
 }
 
-// 系统资源授权给工作空间抽屉（systemShare 模式）。
-// 当前为桩实现：展示可选工作空间列表供开关授权，保存暂未对接后端 systemShare 授权接口。
+/* 资源授权给工作空间抽屉（systemShare 模式）。
+   读取已共享到工作空间的映射；新增共享依赖后端 systemShare 授权接口（待实现）。 */
 const WorkspaceAuthorizationDrawer = forwardRef<WorkspaceAuthorizationDrawerRef, {type?: string}>(
   function WorkspaceAuthorizationDrawer({type = 'MODEL'}, ref) {
     const [open, setOpen] = useState(false)
     const [resourceId, setResourceId] = useState('')
-    const [data, setData] = useState<Array<any>>([{key: 'default', name: '默认工作空间', authorized: false}])
+    const [list, setList] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
     const t = useTranslations()
 
     useImperativeHandle(ref, () => ({
@@ -23,15 +25,15 @@ const WorkspaceAuthorizationDrawer = forwardRef<WorkspaceAuthorizationDrawerRef,
       },
     }))
 
-    const toggle = (key: string, val: boolean) => {
-      setData((d) => d.map((row) => (row.key === key ? {...row, authorized: val} : row)))
-    }
-
-    const save = () => {
-      // TODO: 对接后端 systemShare 授权接口（apps/models_provider 等），此处暂为桩实现。
-      message.success(t('common.saveSuccess'))
-      setOpen(false)
-    }
+    useEffect(() => {
+      if (open && resourceId) {
+        setLoading(true)
+        systemApi.getResourceMapping(type, resourceId, 'WORKSPACE')
+          .then((res: any) => setList(res.data || []))
+          .catch(() => setList([]))
+          .finally(() => setLoading(false))
+      }
+    }, [open, resourceId])
 
     return (
       <Drawer
@@ -39,28 +41,30 @@ const WorkspaceAuthorizationDrawer = forwardRef<WorkspaceAuthorizationDrawerRef,
         open={open}
         onClose={() => setOpen(false)}
         width={480}
-        destroyOnHidden
+        destroyOnClose
         extra={
-          <Button type="primary" onClick={save}>
-            {t('common.save')}
-          </Button>
+          <span style={{color: '#999', fontSize: 12}} onClick={() => message.info('后端共享授权接口待实现')}>
+            新增共享
+          </span>
         }
       >
-        <Typography.Paragraph type="secondary">
-          {type} · {resourceId}
-        </Typography.Paragraph>
-        <Table
-          dataSource={data}
-          pagination={false}
-          columns={[
-            {title: t('common.name'), dataIndex: 'name'},
-            {
-              title: t('common.authorization'),
-              dataIndex: 'authorized',
-              render: (val: boolean, row: any) => <Switch checked={val} onChange={(v) => toggle(row.key, v)} />,
-            },
-          ]}
-        />
+        <Typography.Paragraph type="secondary">{type} · {resourceId}</Typography.Paragraph>
+        {loading ? (
+          <div style={{textAlign: 'center', padding: 40}}><Spin /></div>
+        ) : list.length === 0 ? (
+          <Empty description="尚未共享到工作空间" />
+        ) : (
+          <Table
+            dataSource={list}
+            rowKey="id"
+            pagination={false}
+            size="small"
+            columns={[
+              {title: '源类型', dataIndex: 'source_type', key: 'source_type', render: (v: string) => <Tag>{v}</Tag>},
+              {title: '工作空间', dataIndex: 'target_id', key: 'target_id', ellipsis: true},
+            ]}
+          />
+        )}
       </Drawer>
     )
   },

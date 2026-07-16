@@ -1,6 +1,7 @@
 'use client'
 import {create} from 'zustand'
 import {LOCALE_KEY} from '@/lib/constants'
+import {get as httpGet} from '@/lib/request'
 import {loginApi} from '@/lib/api/login'
 
 export interface UserInfo {
@@ -34,10 +35,11 @@ export const useUserStore = create<UserStore>((set, get) => ({
   userInfo: null,
   workspace_id: '',
   rsaKey: null,
-  // 从 /profile 的 data.rsa 取 RSA 公钥（对齐 Vue 端 user.rsaKey）
+  // RSA 公钥由后端公开端点 /system/profile 的 data.rsa 提供（无需登录）。
+  // 注意：/user/profile 需要已登录 token 且不返回 rsa，不能用于登录前取公钥。
   fetchRsa: () => {
-    return loginApi.getProfile().then((res: any) => {
-      const key = res?.data?.rsa ?? null
+    return httpGet('/system/profile').then((res: any) => {
+      const key = res?.data?.rsa ?? res?.rsa ?? null
       set({rsaKey: key})
       return key
     })

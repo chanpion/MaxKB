@@ -373,56 +373,12 @@ async def create_document(
     return DocumentOut.model_validate(document)
 
 
-@router.get("/{knowledge_id}/document/{document_id}", response_model=DocumentOut)
-async def get_document(
-    knowledge_id: str,
-    document_id: str,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
-) -> DocumentOut:
-    document = await session.get(Document, document_id)
-    if document is None or str(document.knowledge_id) != knowledge_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    return DocumentOut.model_validate(document)
-
-
-@router.put("/{knowledge_id}/document/{document_id}", response_model=DocumentOut)
-async def update_document(
-    knowledge_id: str,
-    document_id: str,
-    body: DocumentUpdate,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
-) -> DocumentOut:
-    document = await session.get(Document, document_id)
-    if document is None or str(document.knowledge_id) != knowledge_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-
-    for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(document, field, value)
-
-    await session.commit()
-    await session.refresh(document)
-    return DocumentOut.model_validate(document)
-
-
-@router.delete("/{knowledge_id}/document/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_document(
-    knowledge_id: str,
-    document_id: str,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
-) -> None:
-    document = await session.get(Document, document_id)
-    if document is None or str(document.knowledge_id) != knowledge_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    await session.delete(document)
-    await session.commit()
-
-
 # ---------------------------------------------------------------------------
 # Paragraph CRUD (scoped under document)
 # ---------------------------------------------------------------------------
+# NOTE: get/update/delete_document for the generic `/document/{document_id}` path are
+# registered at the END of this module (see "Generic single-document routes" section)
+# so that constant-segment routes like `document/batch_create` are matched first.
 
 
 @router.get("/{knowledge_id}/document/{document_id}/paragraph", response_model=ParagraphPage)
@@ -1171,7 +1127,7 @@ async def batch_cancel_task(
     return {"result": True}
 
 
-@router.post("/{knowledge_id}/document/batch_create")
+@router.api_route("/{knowledge_id}/document/batch_create", methods=["POST", "PUT"])
 async def batch_create_documents(
     knowledge_id: str,
     request: Request,
@@ -2133,6 +2089,60 @@ async def list_knowledge_versions_paginated(
 ) -> dict:
     """Paginated knowledge base version list via path parameters."""
     return {"result": True, "list": [], "total": 0}
+
+
+# ---------------------------------------------------------------------------
+# Generic single-document routes (MUST be registered LAST so constant-segment
+# routes like `document/batch_create`, `document/batch_delete`, `document/migrate/{id}`,
+# `document/web` are matched first and not shadowed by the `{document_id}` param).
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{knowledge_id}/document/{document_id}", response_model=DocumentOut)
+async def get_document(
+    knowledge_id: str,
+    document_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> DocumentOut:
+    document = await session.get(Document, document_id)
+    if document is None or str(document.knowledge_id) != knowledge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    return DocumentOut.model_validate(document)
+
+
+@router.put("/{knowledge_id}/document/{document_id}", response_model=DocumentOut)
+async def update_document(
+    knowledge_id: str,
+    document_id: str,
+    body: DocumentUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> DocumentOut:
+    document = await session.get(Document, document_id)
+    if document is None or str(document.knowledge_id) != knowledge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(document, field, value)
+
+    await session.commit()
+    await session.refresh(document)
+    return DocumentOut.model_validate(document)
+
+
+@router.delete("/{knowledge_id}/document/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    knowledge_id: str,
+    document_id: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> None:
+    document = await session.get(Document, document_id)
+    if document is None or str(document.knowledge_id) != knowledge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    await session.delete(document)
+    await session.commit()
 
 
 # ---------------------------------------------------------------------------

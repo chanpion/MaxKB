@@ -9,14 +9,18 @@ import os
 import uvicorn
 
 from app.core.config import get_settings
-from app.main import app
 
 os.environ.setdefault("SERVER_NAME", "web")
 
 
 def main() -> None:
     settings = get_settings()
-    uvicorn.run(app, host="0.0.0.0", port=8081, log_level=settings.log_level.lower())
+    uvicorn.run("app.main:app",
+                host=settings.web_host,
+                port=settings.web_port,
+                log_level=settings.log_level.lower(),
+                reload=True
+                )
 
 
 if __name__ == "__main__":

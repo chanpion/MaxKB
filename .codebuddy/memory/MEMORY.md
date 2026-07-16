@@ -16,3 +16,7 @@
 ## 重要事实 / 已知约束
 - `backend/app/core/db.py` 不得调用 `create_all`；表由 legacy Django 创建，迁移仅经 Alembic 增量。
 - `REFACTOR_STATUS.md` 文档内部存在矛盾（"8 节点" vs "36 节点"），实际代码为 36 节点；且"44 张表严格对齐"声明与代码不符（缺 `knowledge_action` 表）。读该文档时需以实际代码为准。
+- **端口约定**：`8081` = 新 FastAPI 后端（`backend/main.py` 的 `port=8081`）；`8080` = 老 Django 后端（`apps/`）。二者可并存。
+- **老 ui 连新后端**：需在 `backend/.env` 设 `MAXKB_API_PREFIX=/admin/api`、`MAXKB_CHAT_API_PREFIX=/chat/api`（PathRewriteMiddleware 据此把老前缀重写到 `/api`）；`ui/vite.config.ts` 代理目标指向 `127.0.0.1:8081`。
+- **新后端运行环境缺依赖**（已修并写入 `backend/pyproject.toml`）：`greenlet`（异步 SQLAlchemy 必需）、`pycryptodome`（`rsa_util` 的 `Crypto`）。实际运行环境为 `miniforge3/envs/py311/bin/python`（`python main.py`，cwd=backend/），非 uv `.venv`。
+- **已知代码缺陷**：`backend/app/core/rsa_util.py` 创建 `SystemSetting` 时未填 `create_time`/`update_time`，与 Django 表 NOT NULL 冲突（已修：填 `datetime.now()`）。

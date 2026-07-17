@@ -23,6 +23,9 @@ LEGACY_ALIASES: list[tuple[str, str]] = [
     (r"^/api/provider/model_form", "/api/model/providers/model_form"),
     (r"^/api/model_list$", "/api/model/list"),
     (r"^/api/profile$", "/api/system/profile"),
+    # Workspace resource-user permission (folder / resource authorization drawer in the
+    # legacy Vue UI): /api/resource_user_permission/... → /api/system/resource_user_permission/...
+    (r"^/api/resource_user_permission/(.+)$", r"/api/system/resource_user_permission/\1"),
 ]
 
 

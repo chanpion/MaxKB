@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -90,6 +90,153 @@ async def get_setting(
 # ---------------------------------------------------------------------------
 # Permissions — workspace user resource permissions
 # ---------------------------------------------------------------------------
+
+# Mirrors Django ``ResourceUserPermissionSerializer.permission_map``.
+RESOURCE_PERMISSION_MAP = {
+    "ROLE": ("ROLE", ["ROLE"]),
+    "MANAGE": ("RESOURCE_PERMISSION_GROUP", ["MANAGE", "VIEW"]),
+    "VIEW": ("RESOURCE_PERMISSION_GROUP", ["VIEW"]),
+    "NOT_AUTH": ("RESOURCE_PERMISSION_GROUP", []),
+}
+
+
+def _derive_permission(perm_row) -> str:
+    """Translate a ``WorkspaceUserResourcePermission`` row into a single
+    effective permission label (NOT_AUTH / ROLE / MANAGE / VIEW)."""
+    if perm_row is None:
+        return "NOT_AUTH"
+    pl = perm_row.permission_list or []
+    if perm_row.auth_type == "ROLE" and "ROLE" in pl:
+        return "ROLE"
+    if perm_row.auth_type == "RESOURCE_PERMISSION_GROUP":
+        if "MANAGE" in pl:
+            return "MANAGE"
+        if "VIEW" in pl:
+            return "VIEW"
+    return "NOT_AUTH"
+
+
+@router.get("/resource_user_permission/resource/{target}/resource/{resource}/{current_page}/{page_size}")
+async def list_resource_user_permissions(
+    target: str,
+    resource: str,
+    current_page: int = 1,
+    page_size: int = 20,
+    nick_name: str | None = None,
+    username: str | None = None,
+    permission: list[str] | None = Query(default=None),
+    workspace_id: str = "default",
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    """List users and their effective permission for a given resource (paginated).
+
+    Path mirrors the legacy Django
+    ``/workspace/<ws>/resource_user_permission/resource/<target>/resource/<resource>/<page>/<size>``.
+    ``resource`` may carry a ``_FOLDER`` suffix which is stripped to the
+    underlying auth target type (e.g. ``KNOWLEDGE_FOLDER`` -> ``KNOWLEDGE``).
+    Returns ``{"records": [...], "total": N}`` (the legacy response middleware
+    wraps it as ``{code, data:{records,total}, message}``).
+    """
+    auth_target_type = resource.replace("_FOLDER", "")
+
+    user_conditions = []
+    if nick_name:
+        user_conditions.append(User.nick_name.contains(nick_name))
+    if username:
+        user_conditions.append(User.username.contains(username))
+    users = (
+        await session.execute(select(User).where(*user_conditions).order_by(User.nick_name))
+    ).scalars().all()
+
+    perm_rows = (
+        await session.execute(
+            select(WorkspaceUserResourcePermission).where(
+                WorkspaceUserResourcePermission.workspace_id == workspace_id,
+                WorkspaceUserResourcePermission.auth_target_type == auth_target_type,
+                WorkspaceUserResourcePermission.target == target,
+            )
+        )
+    ).scalars().all()
+    perm_by_user = {p.user_id: p for p in perm_rows}
+
+    records = []
+    for u in users:
+        perm = _derive_permission(perm_by_user.get(u.id))
+        if permission and perm not in permission:
+            continue
+        records.append(
+            {
+                "id": str(u.id),
+                "nick_name": u.nick_name,
+                "username": u.username,
+                "permission": perm,
+            }
+        )
+
+    total = len(records)
+    start = (current_page - 1) * page_size
+    return {"records": records[start : start + page_size], "total": total}
+
+
+@router.put("/resource_user_permission/resource/{target}/resource/{resource}")
+async def edit_resource_user_permissions(
+    target: str,
+    resource: str,
+    body: list[dict],
+    workspace_id: str = "default",
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    """Grant / revoke a list of users' permission on a resource.
+
+    ``body`` is a list of ``{"user_id": ..., "permission": "VIEW"|"MANAGE"|"ROLE"|"NOT_AUTH",
+    "include_children"?: bool, "folder_ids"?: [...]}`` (mirrors the Django
+    ``ResourceUserPermissionSerializer.edit`` contract).
+    """
+    auth_target_type = resource.replace("_FOLDER", "")
+    if not isinstance(body, list) or len(body) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty permission list")
+
+    user_ids = [item.get("user_id") for item in body]
+    include_children = body[0].get("include_children")
+    folder_ids = body[0].get("folder_ids") or []
+    if include_children and folder_ids:
+        managed_resource_ids = list(folder_ids) + [target]
+    else:
+        managed_resource_ids = [target]
+    # de-duplicate while preserving order
+    managed_resource_ids = list(dict.fromkeys(managed_resource_ids))
+
+    await session.execute(
+        delete(WorkspaceUserResourcePermission).where(
+            WorkspaceUserResourcePermission.workspace_id == workspace_id,
+            WorkspaceUserResourcePermission.target.in_(managed_resource_ids),
+            WorkspaceUserResourcePermission.auth_target_type == auth_target_type,
+            WorkspaceUserResourcePermission.user_id.in_(user_ids),
+        )
+    )
+
+    new_rows = []
+    for resource_id in managed_resource_ids:
+        for item in body:
+            perm = item.get("permission", "VIEW")
+            if perm not in RESOURCE_PERMISSION_MAP:
+                continue
+            auth_type, perm_list = RESOURCE_PERMISSION_MAP[perm]
+            new_rows.append(
+                WorkspaceUserResourcePermission(
+                    workspace_id=workspace_id,
+                    user_id=item.get("user_id"),
+                    auth_target_type=auth_target_type,
+                    target=resource_id,
+                    auth_type=auth_type,
+                    permission_list=perm_list,
+                )
+            )
+    session.add_all(new_rows)
+    await session.commit()
+    return {"code": 200, "data": None, "message": "success"}
 
 
 @router.get("/permission/user/{user_id}/resource/{resource_type}")

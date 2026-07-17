@@ -4,6 +4,7 @@ NOTE: both `models_provider` and `local_model` define a `Model` pointing to the
 same `model` table. Defined ONCE here. Stores provider model credentials.
 """
 
+from typing import Any
 from uuid import UUID
 
 import uuid_utils.compat as uuid
@@ -26,5 +27,5 @@ class Model(AppTableBase, table=True):
     provider: str = Field(default="", max_length=128, index=True)
     credential: str = Field(default="", max_length=102400)
     meta: dict = Field(default={}, sa_column=Column(JSONB))
-    model_params_form: list = Field(default=[], sa_column=Column(JSONB))
+    model_params_form: Any = Field(default={}, sa_column=Column(JSONB))
     workspace_id: str = Field(default="default", max_length=64, index=True)

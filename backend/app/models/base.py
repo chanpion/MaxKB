@@ -21,8 +21,13 @@ class AppTableBase(SQLModel):
     # in this base class body would be SHARED by every `table=True` subclass,
     # causing "Column object 'create_time' already assigned to Table 'X'".
     # Plain `Field` makes SQLModel build a fresh `Column` per subclass instead.
-    create_time: datetime | None = Field(default=None, index=True)
-    update_time: datetime | None = Field(default=None, index=True)
+    # `default_factory` populates these on Python-side construction so inserts
+    # never violate the legacy NOT-NULL `create_time`/`update_time` columns
+    # (the DB has no server default). This is pydantic-level only, so it does
+    # NOT create a shared `Column` instance (see sa_column warning above) and
+    # needs no schema/Alembic change.
+    create_time: datetime | None = Field(default_factory=datetime.now, index=True)
+    update_time: datetime | None = Field(default_factory=datetime.now, index=True)
 
 
 def uuid7() -> UUID:

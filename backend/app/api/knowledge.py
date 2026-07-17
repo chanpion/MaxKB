@@ -112,10 +112,31 @@ async def list_knowledge_folders(
     _: User = Depends(get_current_user),
 ) -> list[dict]:
     result = await session.execute(
-        select(KnowledgeFolder).where(KnowledgeFolder.workspace_id == workspace_id).order_by(KnowledgeFolder.lft)
+        select(KnowledgeFolder)
+        .where(KnowledgeFolder.workspace_id == workspace_id)
+        .order_by(KnowledgeFolder.create_time)
     )
     rows = result.scalars().all()
-    return [{"id": f.id, "name": f.name, "desc": f.desc, "parent_id": f.parent_id} for f in rows]
+
+    # The Next.js tree view needs a *nested* structure (each node carrying a
+    # ``children`` array); a flat list would render every folder at the top
+    # level. Build the tree purely from ``parent_id`` so we don't depend on the
+    # legacy MPTT (lft/rght) columns, which are not maintained on insert.
+    folders = [
+        {"id": f.id, "name": f.name, "desc": f.desc, "parent_id": f.parent_id}
+        for f in rows
+    ]
+    ids = {f["id"] for f in folders}
+    children_map: dict[str | None, list[dict]] = {}
+    for f in folders:
+        children_map.setdefault(f["parent_id"], []).append(f)
+    for f in folders:
+        f["children"] = children_map.get(f["id"], [])
+
+    # Roots: parent_id is NULL or points to a folder that does not exist
+    # (e.g. the 'default' workspace marker when the default folder is absent).
+    roots = [f for f in folders if f["parent_id"] is None or f["parent_id"] not in ids]
+    return roots
 
 
 @router.post("/folder", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -1605,30 +1626,64 @@ async def get_split_pattern(
 @router.post("/{knowledge_id}/document/split")
 async def split_document(
     knowledge_id: str,
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     patterns: str = Form("[]"),
-    limit: int = Form(500),
+    limit: int = Form(4096),
     with_filter: bool = Form(True),
-    session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> list[dict]:
-    """Split preview: upload a file and return paragraph preview as an array."""
-    content = await file.read()
-    text = content.decode("utf-8", errors="replace")
-    # Split text into paragraphs by double newlines
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    preview = [
-        {
-            "name": f"{file.filename or 'document'}-{i + 1}",
-            "content": [
-                {
-                    "title": p[:50],
-                    "content": p,
-                }
-            ],
-        }
-        for i, p in enumerate(paragraphs[:20])
-    ]
+    """Split preview: upload file(s) and return a paragraph preview array.
+
+    Mirrors the legacy Django ``DocumentView.Split`` response shape so the
+    (Vue) admin frontend renders correctly:
+
+    * one item **per uploaded file** (not per paragraph);
+    * each item keeps the original file ``name``;
+    * ``content`` is the full list of ``{title, content}`` paragraphs
+      produced by MaxKB's structure-aware splitter (markdown heading /
+      blank-line regex + smart length splitting);
+    * ``source_file_id`` is returned for downstream ``batch_create`` parity.
+
+    Accepts an optional ``patterns`` JSON array of custom regexes; when empty
+    the splitter falls back to the md / default pattern table (same logic as
+    the legacy backend).
+    """
+    import json
+
+    from uuid import uuid4
+
+    from app.rag.splitter import SplitModel, get_split_model
+
+    # Parse optional custom split patterns (legacy passes a JSON list of regexes).
+    custom_patterns: list[str] = []
+    try:
+        parsed = json.loads(patterns)
+        if isinstance(parsed, list):
+            custom_patterns = [p for p in parsed if isinstance(p, str) and p.strip()]
+    except Exception:
+        custom_patterns = []
+
+    preview: list[dict] = []
+    for file in files:
+        content = await file.read()
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            text = content.decode("utf-8", errors="replace")
+
+        if custom_patterns:
+            split_model = SplitModel(custom_patterns, with_filter=with_filter, limit=limit)
+        else:
+            split_model = get_split_model(file.filename or "document", with_filter=with_filter, limit=limit)
+
+        paragraphs = split_model.parse(text)
+        preview.append(
+            {
+                "name": file.filename or "document",
+                "content": paragraphs,
+                "source_file_id": str(uuid4()),
+            }
+        )
     return preview
 
 

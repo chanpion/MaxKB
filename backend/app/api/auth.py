@@ -97,9 +97,14 @@ async def list_users_alias(
     return [_to_user_out(u) for u in result.scalars().all()]
 
 
-@router.get("/logout")
+@router.api_route("/logout", methods=["GET", "POST"])
 async def logout() -> dict:
-    """Legacy logout endpoint — JWT is stateless, always succeeds."""
+    """Legacy logout endpoint — JWT is stateless, always succeeds.
+
+    Accepts both GET (old ``/user/logout`` alias) and POST (Django
+    ``Logout`` view behavior) so the Next.js frontend's ``post('/user/logout')``
+    no longer hits a 405.
+    """
     return {"code": 200, "data": None, "message": "success"}
 
 

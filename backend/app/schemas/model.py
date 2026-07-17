@@ -17,7 +17,7 @@ class ModelCreate(SQLModel):
     status: str = "SUCCESS"
     workspace_id: str = "default"
     meta: dict = {}
-    model_params_form: list = []
+    model_params_form: Any = {}
 
 
 class ModelOut(SQLModel):

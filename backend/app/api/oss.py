@@ -92,7 +92,7 @@ async def get_file(
     )
 
 
-@router.delete("/file/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/file/{file_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_file(
     file_id: str,
     session: AsyncSession = Depends(get_session),

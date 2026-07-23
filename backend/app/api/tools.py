@@ -230,7 +230,7 @@ async def update_tool(
     return ToolOut.model_validate(tool)
 
 
-@router.delete("/{tool_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{tool_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_tool(
     tool_id: str,
     session: AsyncSession = Depends(get_session),

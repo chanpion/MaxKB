@@ -279,7 +279,7 @@ async def update_shared_model(
     return await _update_model(model_id, body, session)
 
 
-@router.delete("/shared/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/shared/{model_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_shared_model(
     model_id: str,
     session: AsyncSession = Depends(get_session),
@@ -394,7 +394,7 @@ async def update_model(
     return await _update_model(model_id, body, session)
 
 
-@router.delete("/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{model_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_model(
     model_id: str,
     session: AsyncSession = Depends(get_session),

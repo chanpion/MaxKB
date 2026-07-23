@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # --- General ---
     debug: bool = Field(default=False, alias="MAXKB_DEBUG")
     web_host: str = Field(default="0.0.0.0", alias="MAXKB_WEB_HOST")
-    web_port: int = Field(default=8081, alias="MAXKB_WEB_PORT")
+    web_port: int = Field(default=8080, alias="MAXKB_WEB_PORT")
     language_code: str = Field(default="zh-CN", alias="MAXKB_LANGUAGE_CODE")
     time_zone: str = Field(default="Asia/Shanghai", alias="MAXKB_TIME_ZONE")
     log_level: str = Field(default="DEBUG", alias="MAXKB_LOG_LEVEL")

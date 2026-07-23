@@ -10,8 +10,13 @@ mkdir -p "$RUN_DIR"
 
 SERVICE="${1:-all}"
 
-# Prefer `uv run` when available, otherwise fall back to system python.
-if command -v uv >/dev/null 2>&1; then
+# Resolve the Python interpreter. Prefer the operator-prepared environment:
+# local .venv, then the active `python` (venv/conda on PATH), lastly `uv run`.
+if [ -x "./.venv/bin/python" ]; then
+  PY=(./.venv/bin/python)
+elif command -v python >/dev/null 2>&1; then
+  PY=(python)
+elif command -v uv >/dev/null 2>&1; then
   PY=(uv run python)
 else
   PY=(python)

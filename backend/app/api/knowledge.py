@@ -323,7 +323,7 @@ async def update_knowledge(
     return KnowledgeOut.model_validate(knowledge)
 
 
-@router.delete("/{knowledge_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{knowledge_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_knowledge(
     knowledge_id: str,
     session: AsyncSession = Depends(get_session),
@@ -571,7 +571,7 @@ async def create_tag(
     return TagOut.model_validate(tag)
 
 
-@router.delete("/{knowledge_id}/tag/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{knowledge_id}/tag/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_tag(
     knowledge_id: str,
     tag_id: str,
@@ -2186,7 +2186,7 @@ async def update_document(
     return DocumentOut.model_validate(document)
 
 
-@router.delete("/{knowledge_id}/document/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{knowledge_id}/document/{document_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_document(
     knowledge_id: str,
     document_id: str,

@@ -295,7 +295,7 @@ async def grant_permission(
     }
 
 
-@router.delete("/permission/{permission_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/permission/{permission_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def revoke_permission(
     permission_id: str,
     session: AsyncSession = Depends(get_session),

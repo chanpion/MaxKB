@@ -88,7 +88,7 @@ async def update_trigger(
     return TriggerOut.model_validate(trigger)
 
 
-@router.delete("/{trigger_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{trigger_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_trigger(
     trigger_id: str,
     session: AsyncSession = Depends(get_session),

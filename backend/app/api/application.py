@@ -220,7 +220,7 @@ async def update_application(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_application(
     application_id: str,
     session: AsyncSession = Depends(get_session),
@@ -358,7 +358,7 @@ async def create_api_key(
     return ApiKeyOut.model_validate(key)
 
 
-@router.delete("/{application_id}/application_key/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{application_id}/application_key/{key_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_api_key(
     application_id: str,
     key_id: str,

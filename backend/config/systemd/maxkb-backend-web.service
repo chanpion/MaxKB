@@ -1,0 +1,19 @@
+[Unit]
+Description=MaxKB FastAPI Backend — web API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__INSTALL_DIR__
+EnvironmentFile=__INSTALL_DIR__/.env
+ExecStart=/bin/bash -c 'if [ -x __INSTALL_DIR__/.venv/bin/python ]; then exec __INSTALL_DIR__/.venv/bin/python -m uvicorn app.main:app --host "${MAXKB_WEB_HOST:-0.0.0.0}" --port "${MAXKB_WEB_PORT:-8080}" --log-level "${MAXKB_LOG_LEVEL:-info}"; else exec uv run python -m uvicorn app.main:app --host "${MAXKB_WEB_HOST:-0.0.0.0}" --port "${MAXKB_WEB_PORT:-8080}" --log-level "${MAXKB_LOG_LEVEL:-info}"; fi'
+Restart=on-failure
+RestartSec=5
+User=__RUN_USER__
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

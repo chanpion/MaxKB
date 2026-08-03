@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# coding=utf-8
 """CI migration guard for the MaxKB FastAPI backend.
 
 Scans every Alembic migration file under ``alembic/versions`` and FAILS the build

@@ -1,0 +1,126 @@
+# MaxKB FastAPI backend — production compose stack.
+#
+# Brings up four services:
+#   - postgres : PostgreSQL 17 + pgvector (auto-runs init.sql on first start)
+#   - redis    : Redis 7 (cache + arq broker)
+#   - app      : FastAPI API (uvicorn)            — SERVICE_MODE=web
+#   - worker   : arq async worker (ingest/triggers) — SERVICE_MODE=worker
+#
+# The `app` and `worker` services share the same image built from ./Dockerfile;
+# the SERVICE_MODE env var selects the booted process.
+#
+# Quick start:
+#   cp .env.example .env        # adjust credentials
+#   docker compose up -d --build
+#
+# Variable substitution: docker compose reads values from the .env file in this
+# directory; every value below has a safe default so it also works without one.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: maxkb-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MAXKB_DB_USER:-maxkb}
+      POSTGRES_PASSWORD: ${MAXKB_DB_PASSWORD:-maxkb123}
+      POSTGRES_DB: ${MAXKB_DB_NAME:-maxkb}
+    ports:
+      - "${MAXKB_DB_PORT:-5432}:5432"
+    volumes:
+      - maxkb_pg:/var/lib/postgresql/data
+      # init.sql enables the `vector` extension on first initialization only.
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MAXKB_DB_USER:-maxkb} -d ${MAXKB_DB_NAME:-maxkb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: maxkb-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${MAXKB_REDIS_PASSWORD:-maxkb123}"]
+    ports:
+      - "${MAXKB_REDIS_PORT:-6379}:6379"
+    volumes:
+      - maxkb_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${MAXKB_REDIS_PASSWORD:-maxkb123}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: maxkb-backend:${MAXKB_IMAGE_TAG:-latest}
+    container_name: maxkb-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVER_NAME: web
+      SERVICE_MODE: web
+      MAXKB_DB_HOST: postgres
+      MAXKB_DB_PORT: 5432
+      MAXKB_DB_NAME: ${MAXKB_DB_NAME:-maxkb}
+      MAXKB_DB_USER: ${MAXKB_DB_USER:-maxkb}
+      MAXKB_DB_PASSWORD: ${MAXKB_DB_PASSWORD:-maxkb123}
+      MAXKB_REDIS_HOST: redis
+      MAXKB_REDIS_PORT: 6379
+      MAXKB_REDIS_PASSWORD: ${MAXKB_REDIS_PASSWORD:-maxkb123}
+      MAXKB_REDIS_DB: ${MAXKB_REDIS_DB:-0}
+      MAXKB_WEB_HOST: 0.0.0.0
+      MAXKB_WEB_PORT: 8080
+      MAXKB_LOG_LEVEL: ${MAXKB_LOG_LEVEL:-info}
+      MAXKB_API_PREFIX: ${MAXKB_API_PREFIX:-/admin/api}
+      MAXKB_CHAT_API_PREFIX: ${MAXKB_CHAT_API_PREFIX:-/chat/api}
+    ports:
+      - "${MAXKB_WEB_PORT:-8080}:8080"
+    volumes:
+      - maxkb_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/api/health').status==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: maxkb-backend:${MAXKB_IMAGE_TAG:-latest}
+    container_name: maxkb-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVER_NAME: web
+      SERVICE_MODE: worker
+      MAXKB_DB_HOST: postgres
+      MAXKB_DB_PORT: 5432
+      MAXKB_DB_NAME: ${MAXKB_DB_NAME:-maxkb}
+      MAXKB_DB_USER: ${MAXKB_DB_USER:-maxkb}
+      MAXKB_DB_PASSWORD: ${MAXKB_DB_PASSWORD:-maxkb123}
+      MAXKB_REDIS_HOST: redis
+      MAXKB_REDIS_PORT: 6379
+      MAXKB_REDIS_PASSWORD: ${MAXKB_REDIS_PASSWORD:-maxkb123}
+      MAXKB_REDIS_DB: ${MAXKB_REDIS_DB:-0}
+      MAXKB_LOG_LEVEL: ${MAXKB_LOG_LEVEL:-info}
+    volumes:
+      - maxkb_uploads:/app/uploads
+
+volumes:
+  maxkb_pg:
+  maxkb_redis:
+  maxkb_uploads:

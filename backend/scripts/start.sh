@@ -8,6 +8,13 @@ ROOT="$(pwd)"
 RUN_DIR="$ROOT/run"
 mkdir -p "$RUN_DIR"
 
+# Load .env (if present) so port / prefix / log-level / secrets reach the services.
+if [ -f "$ROOT/.env" ]; then
+  set -a; . "$ROOT/.env"; set +a
+fi
+# Role selector: web | local_model. Workers do not branch on this.
+export SERVER_NAME="${SERVER_NAME:-web}"
+
 SERVICE="${1:-all}"
 
 # Resolve the Python interpreter. Prefer the operator-prepared environment:
@@ -35,9 +42,18 @@ start_one() {
   echo "[$name] started (pid $(cat "$pidfile")), log -> run/$name.log"
 }
 
+# Web is started directly via uvicorn (no `--reload`) so it matches the systemd unit
+# and is safe for background/production use. `reload` stays only in the dev entrypoint main.py.
+web_cmd() {
+  start_one web -m uvicorn app.main:app \
+    --host "${MAXKB_WEB_HOST:-0.0.0.0}" \
+    --port "${MAXKB_WEB_PORT:-8080}" \
+    --log-level "${MAXKB_LOG_LEVEL:-info}"
+}
+
 case "$SERVICE" in
   web)
-    start_one web main.py
+    web_cmd
     ;;
   worker)
     start_one worker -c "from app.core.tasks import run_worker; run_worker()"
@@ -46,7 +62,7 @@ case "$SERVICE" in
     start_one local_model main_local_model.py
     ;;
   all)
-    start_one web main.py
+    web_cmd
     start_one worker -c "from app.core.tasks import run_worker; run_worker()"
     ;;
   *)

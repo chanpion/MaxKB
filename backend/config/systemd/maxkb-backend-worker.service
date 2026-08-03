@@ -1,0 +1,19 @@
+[Unit]
+Description=MaxKB FastAPI Backend — arq worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__INSTALL_DIR__
+EnvironmentFile=__INSTALL_DIR__/.env
+ExecStart=/bin/bash -c 'if [ -x __INSTALL_DIR__/.venv/bin/python ]; then exec __INSTALL_DIR__/.venv/bin/python -c "from app.core.tasks import run_worker; run_worker()"; else exec uv run python -c "from app.core.tasks import run_worker; run_worker()"; fi'
+Restart=on-failure
+RestartSec=5
+User=__RUN_USER__
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

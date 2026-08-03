@@ -1,0 +1,39 @@
+# MaxKB FastAPI backend — Docker build context ignore rules.
+# Keeps the build context small and prevents host-specific/runtime artifacts
+# from leaking into the image.
+
+# ---- Version control / CI ----
+.git
+.gitignore
+.github
+
+# ---- Virtualenvs / local caches ----
+.venv
+venv
+.env
+.pytest_cache
+.ruff_cache
+.mypy_cache
+__pycache__
+*.py[cod]
+
+# ---- Runtime data (mounted as volumes at runtime) ----
+uploads
+run
+logs
+*.log
+
+# ---- Local secrets / environment overrides ----
+.env.local
+*.local
+
+# ---- Docs / non-runtime assets ----
+docs
+*.md
+CLAUDE.md
+CODEBUDDY.md
+
+# ---- OS noise ----
+.DS_Store
+.idea
+.vscode

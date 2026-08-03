@@ -54,19 +54,67 @@ router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=KnowledgePage)
+async def _build_knowledge_out(session: AsyncSession, k: Knowledge) -> KnowledgeOut:
+    data = KnowledgeOut.model_validate(k)
+    data.document_count = await session.scalar(
+        select(func.count()).select_from(Document).where(Document.knowledge_id == k.id)
+    ) or 0
+    data.char_length = (
+        await session.scalar(
+            select(func.coalesce(func.sum(Document.char_length), 0)).where(Document.knowledge_id == k.id)
+        )
+        or 0
+    )
+    if k.user_id:
+        owner = await session.get(User, k.user_id)
+        data.user_name = owner.nick_name if owner else ""
+    if k.embedding_model_id:
+        model = await session.get(Model, k.embedding_model_id)
+        data.embedding_model_name = model.name if model else ""
+    return data
+
+
+async def _list_knowledge_stmt(folder_id: str | None, name: str | None, desc: str | None):
+    stmt = select(Knowledge)
+    if folder_id:
+        stmt = stmt.where(Knowledge.folder_id == folder_id)
+    if name:
+        stmt = stmt.where(Knowledge.name.ilike(f"%{name}%"))
+    if desc:
+        stmt = stmt.where(Knowledge.desc.ilike(f"%{desc}%"))
+    return stmt.order_by(Knowledge.create_time.desc())
+
+
+@router.get("", response_model=list[KnowledgeOut])
 async def list_knowledge(
-    page: int = 1,
-    size: int = 10,
+    folder_id: str | None = None,
+    name: str | None = None,
+    desc: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[KnowledgeOut]:
+    stmt = await _list_knowledge_stmt(folder_id, name, desc)
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [await _build_knowledge_out(session, k) for k in rows]
+
+
+@router.get("/{current_page}/{page_size}", response_model=KnowledgePage)
+async def list_knowledge_page(
+    current_page: int = 1,
+    page_size: int = 10,
+    folder_id: str | None = None,
+    name: str | None = None,
+    desc: str | None = None,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> KnowledgePage:
-    total = await session.scalar(select(func.count()).select_from(Knowledge))
-    result = await session.execute(
-        select(Knowledge).order_by(Knowledge.create_time.desc()).offset((page - 1) * size).limit(size)
-    )
+    stmt = await _list_knowledge_stmt(folder_id, name, desc)
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+    result = await session.execute(stmt.offset(max(current_page - 1, 0) * page_size).limit(page_size))
     rows = result.scalars().all()
-    return KnowledgePage(records=[KnowledgeOut.model_validate(k) for k in rows], total=total or 0)
+    records = [await _build_knowledge_out(session, k) for k in rows]
+    return KnowledgePage(records=records, total=total or 0, current=current_page, size=page_size)
 
 
 @router.post("", response_model=KnowledgeOut, status_code=status.HTTP_201_CREATED)
@@ -341,11 +389,15 @@ async def delete_knowledge(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{knowledge_id}/document", response_model=DocumentPage)
+@router.get("/{knowledge_id}/document/{current_page}/{page_size}", response_model=DocumentPage)
 async def list_documents(
     knowledge_id: str,
-    page: int = 1,
-    size: int = 10,
+    current_page: int = 1,
+    page_size: int = 10,
+    name: str | None = None,
+    status: str | None = None,
+    is_active: str | None = None,
+    order_by: str | None = None,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> DocumentPage:
@@ -353,18 +405,50 @@ async def list_documents(
     if knowledge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
 
-    total = await session.scalar(
-        select(func.count()).select_from(Document).where(Document.knowledge_id == knowledge_id)
-    )
-    result = await session.execute(
-        select(Document)
-        .where(Document.knowledge_id == knowledge_id)
-        .order_by(Document.create_time.desc())
-        .offset((page - 1) * size)
-        .limit(size)
-    )
+    stmt = select(Document).where(Document.knowledge_id == knowledge_id)
+    if name:
+        stmt = stmt.where(Document.name.ilike(f"%{name}%"))
+    if status:
+        stmt = stmt.where(Document.status == status)
+    if is_active is not None and is_active != "":
+        is_active_bool = is_active.lower() in ("1", "true", "yes", "on")
+        stmt = stmt.where(Document.is_active == is_active_bool)
+
+    if order_by:
+        for part in order_by.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            field = part.lstrip("-")
+            col = getattr(Document, field, None)
+            if col is not None:
+                stmt = stmt.order_by(col.desc() if part.startswith("-") else col.asc())
+    else:
+        stmt = stmt.order_by(Document.update_time.desc())
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+    result = await session.execute(stmt.offset(max(current_page - 1, 0) * page_size).limit(page_size))
     rows = result.scalars().all()
-    return DocumentPage(records=[DocumentOut.model_validate(d) for d in rows], total=total or 0)
+
+    records = []
+    for d in rows:
+        data = DocumentOut.model_validate(d)
+        data.paragraph_count = await session.scalar(
+            select(func.count()).where(Paragraph.document_id == d.id)
+        ) or 0
+        owner = await session.get(User, d.user_id)
+        data.nick_name = owner.nick_name if owner else ""
+        tag_ids = (
+            await session.execute(select(DocumentTag.tag_id).where(DocumentTag.document_id == d.id))
+        ).scalars().all()
+        data.tag_count = len(tag_ids)
+        if tag_ids:
+            tag_rows = (await session.execute(select(Tag).where(Tag.id.in_(tag_ids)))).scalars().all()
+            data.tags = [
+                {"id": str(t.id), "name": f"{t.key}:{t.value}" if t.value else t.key} for t in tag_rows
+            ]
+        records.append(data.model_dump())
+    return DocumentPage(records=records, total=total or 0, current=current_page, size=page_size)
 
 
 @router.post("/{knowledge_id}/document", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
@@ -402,12 +486,14 @@ async def create_document(
 # so that constant-segment routes like `document/batch_create` are matched first.
 
 
-@router.get("/{knowledge_id}/document/{document_id}/paragraph", response_model=ParagraphPage)
+@router.get("/{knowledge_id}/document/{document_id}/paragraph/{current_page}/{page_size}", response_model=ParagraphPage)
 async def list_paragraphs(
     knowledge_id: str,
     document_id: str,
-    page: int = 1,
-    size: int = 20,
+    current_page: int = 1,
+    page_size: int = 20,
+    title: str | None = None,
+    content: str | None = None,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> ParagraphPage:
@@ -415,18 +501,20 @@ async def list_paragraphs(
     if document is None or str(document.knowledge_id) != knowledge_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    total = await session.scalar(
-        select(func.count()).select_from(Paragraph).where(Paragraph.document_id == document_id)
-    )
+    stmt = select(Paragraph).where(Paragraph.document_id == document_id)
+    if title:
+        stmt = stmt.where(Paragraph.title.ilike(f"%{title}%"))
+    if content:
+        stmt = stmt.where(Paragraph.content.ilike(f"%{content}%"))
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
     result = await session.execute(
-        select(Paragraph)
-        .where(Paragraph.document_id == document_id)
-        .order_by(Paragraph.position.asc())
-        .offset((page - 1) * size)
-        .limit(size)
+        stmt.order_by(Paragraph.position.asc()).offset(max(current_page - 1, 0) * page_size).limit(page_size)
     )
     rows = result.scalars().all()
-    return ParagraphPage(records=[ParagraphOut.model_validate(p) for p in rows], total=total or 0)
+    return ParagraphPage(
+        records=[ParagraphOut.model_validate(p) for p in rows], total=total or 0, current=current_page, size=page_size
+    )
 
 
 @router.get(
@@ -547,7 +635,7 @@ async def hit_test(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{knowledge_id}/tag", response_model=list[TagOut])
+@router.get("/{knowledge_id}/tags", response_model=list[TagOut])
 async def list_tags(
     knowledge_id: str,
     session: AsyncSession = Depends(get_session),
@@ -557,7 +645,7 @@ async def list_tags(
     return [TagOut.model_validate(t) for t in result.scalars().all()]
 
 
-@router.post("/{knowledge_id}/tag", response_model=TagOut, status_code=status.HTTP_201_CREATED)
+@router.post("/{knowledge_id}/tags", response_model=TagOut, status_code=status.HTTP_201_CREATED)
 async def create_tag(
     knowledge_id: str,
     body: TagCreate,
@@ -571,7 +659,44 @@ async def create_tag(
     return TagOut.model_validate(tag)
 
 
-@router.delete("/{knowledge_id}/tag/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.put("/{knowledge_id}/tags/batch_delete")
+async def batch_delete_tag(
+    knowledge_id: str,
+    body: list[str],
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> dict:
+    knowledge = await session.get(Knowledge, knowledge_id)
+    if knowledge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
+    for tid in body:
+        tag = await session.get(Tag, tid)
+        if tag is not None and str(tag.knowledge_id) == knowledge_id:
+            await session.delete(tag)
+    await session.commit()
+    return {"result": True}
+
+
+@router.put("/{knowledge_id}/tags/{tag_id}", response_model=TagOut)
+async def update_tag(
+    knowledge_id: str,
+    tag_id: str,
+    body: TagCreate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> TagOut:
+    tag = await session.get(Tag, tag_id)
+    if tag is None or str(tag.knowledge_id) != knowledge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+    tag.key = body.key
+    tag.value = body.value
+    session.add(tag)
+    await session.commit()
+    await session.refresh(tag)
+    return TagOut.model_validate(tag)
+
+
+@router.delete("/{knowledge_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_tag(
     knowledge_id: str,
     tag_id: str,
@@ -583,6 +708,17 @@ async def delete_tag(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
     await session.delete(tag)
     await session.commit()
+
+
+@router.delete("/{knowledge_id}/tags/{tag_id}/{type}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+async def delete_tag_with_type(
+    knowledge_id: str,
+    tag_id: str,
+    type: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> None:
+    await delete_tag(knowledge_id, tag_id, session, _)
 
 
 # ---------------------------------------------------------------------------
@@ -1199,7 +1335,7 @@ async def batch_create_documents(
     pending: list[tuple[str, str | None]] = []  # (document_id, user_id)
     for item in body:
         name = item.get("name", "document")
-        paragraphs = item.get("paragraphs", []) or []
+        paragraphs = item.get("paragraphs", []) or item.get("content", []) or []
         doc = Document(
             knowledge_id=knowledge_id,
             name=name,
@@ -1626,7 +1762,7 @@ async def get_split_pattern(
 @router.post("/{knowledge_id}/document/split")
 async def split_document(
     knowledge_id: str,
-    files: list[UploadFile] = File(...),
+    file: list[UploadFile] = File(...),
     patterns: str = Form("[]"),
     limit: int = Form(4096),
     with_filter: bool = Form(True),
@@ -1664,8 +1800,8 @@ async def split_document(
         custom_patterns = []
 
     preview: list[dict] = []
-    for file in files:
-        content = await file.read()
+    for f in file:
+        content = await f.read()
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
@@ -1674,12 +1810,12 @@ async def split_document(
         if custom_patterns:
             split_model = SplitModel(custom_patterns, with_filter=with_filter, limit=limit)
         else:
-            split_model = get_split_model(file.filename or "document", with_filter=with_filter, limit=limit)
+            split_model = get_split_model(f.filename or "document", with_filter=with_filter, limit=limit)
 
         paragraphs = split_model.parse(text)
         preview.append(
             {
-                "name": file.filename or "document",
+                "name": f.filename or "document",
                 "content": paragraphs,
                 "source_file_id": str(uuid4()),
             }

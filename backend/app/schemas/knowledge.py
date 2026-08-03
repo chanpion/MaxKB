@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from pydantic import model_validator
 from sqlmodel import SQLModel
 
 # --- Knowledge ---
@@ -40,6 +41,11 @@ class KnowledgeOut(SQLModel):
     embedding_model_id: uuid.UUID | None = None
     file_size_limit: int = 100
     file_count_limit: int = 50
+    document_count: int = 0
+    char_length: int = 0
+    user_name: str = ""
+    embedding_model_name: str = ""
+    permission: str = ""
     create_time: datetime | None = None
     update_time: datetime | None = None
 
@@ -47,6 +53,8 @@ class KnowledgeOut(SQLModel):
 class KnowledgePage(SQLModel):
     records: Any = []
     total: int = 0
+    current: int = 1
+    size: int = 10
 
 
 KnowledgePage.model_rebuild()
@@ -85,11 +93,26 @@ class DocumentOut(SQLModel):
     status_meta: dict[str, Any] | None = None
     create_time: datetime | None = None
     update_time: datetime | None = None
+    paragraph_count: int = 0
+    nick_name: str = ""
+    tag_count: int = 0
+    tags: list[Any] = []
+
+    @model_validator(mode="after")
+    def _strip_meta_paragraphs(self) -> "DocumentOut":
+        # Paragraphs are persisted as independent Paragraph rows, never inside
+        # document.meta. Drop any legacy `paragraphs` payload to keep list/detail
+        # responses lean (it previously bloated the document list with full text).
+        if isinstance(self.meta, dict) and "paragraphs" in self.meta:
+            self.meta = {k: v for k, v in self.meta.items() if k != "paragraphs"}
+        return self
 
 
 class DocumentPage(SQLModel):
     records: Any = []
     total: int = 0
+    current: int = 1
+    size: int = 10
 
 
 DocumentPage.model_rebuild()
@@ -116,6 +139,8 @@ class ParagraphOut(SQLModel):
 class ParagraphPage(SQLModel):
     records: Any = []
     total: int = 0
+    current: int = 1
+    size: int = 10
 
 
 ParagraphPage.model_rebuild()

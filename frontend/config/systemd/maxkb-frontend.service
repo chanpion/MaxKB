@@ -1,0 +1,20 @@
+[Unit]
+Description=MaxKB Frontend (Next.js standalone)
+Documentation=https://github.com/1panel-dev/MaxKB
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__DEPLOY_DIR__
+Environment=PORT=__PORT__
+Environment=API_TARGET=__API_TARGET__
+ExecStart=/usr/bin/node __DEPLOY_DIR__/server.js
+Restart=on-failure
+RestartSec=5
+User=__RUN_USER__
+Group=__RUN_USER__
+StandardOutput=append:/var/log/maxkb-frontend.log
+StandardError=append:/var/log/maxkb-frontend.log
+
+[Install]
+WantedBy=multi-user.target

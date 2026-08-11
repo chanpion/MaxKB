@@ -49,18 +49,49 @@ OPENAI_COMPAT_ENDPOINTS: dict[str, str | None] = {
     "baichuan": None,
 }
 
+# Local sentence-transformers embedding model (mirrors legacy Django
+# ``local_model_provider`` default). No API key required. When no explicit local
+# checkpoint is configured (``settings.local_embedding_model_path``), this
+# HuggingFace id is downloaded on first use. Dimension defaults to 768.
+DEFAULT_LOCAL_EMBEDDING_MODEL = "shibing624/text2vec-base-chinese"
+LOCAL_EMBEDDING_DIM = 768
+
+# Process-wide cache of local embedder instances, keyed by model id, so we
+# never reload the ~400MB weights on every request.
+_LOCAL_EMBEDDER_CACHE: dict[str, Any] = {}
+
 
 def _norm(provider: str) -> str:
     """Normalize 'model_provider.openai' / 'OPENAI' -> 'openai'."""
     return (provider or "").split(".")[-1].lower()
 
 
-def _api_key(credential: dict) -> str:
+def _coerce_credential(credential: Any) -> dict:
+    """Accept either a dict or a stored credential string (plaintext JSON or
+    Fernet-encrypted). Returns a dict in all cases.
+
+    ``Model.credential`` is persisted as a JSON/encrypted string, so callers
+    sometimes pass the raw column value. Normalize here so ``get_embedder`` /
+    ``get_llm`` never choke on a ``str`` (``'str' object has no attribute 'get'``).
+    """
+    if isinstance(credential, dict):
+        return credential
+    if isinstance(credential, str) and credential.strip():
+        from app.providers.base import resolve_credential
+
+        return resolve_credential(credential)
+    return {}
+
+
+def _api_key(credential: Any) -> str:
+    if isinstance(credential, str):
+        credential = _coerce_credential(credential)
     return credential.get("api_key") or credential.get("apiKey") or credential.get("AK") or ""
 
 
 def get_llm(provider: str, model_name: str, credential: dict, **kwargs: Any):
     """Return an Agno LLM model instance for the given legacy vendor."""
+    credential = _coerce_credential(credential)
     p = _norm(provider)
     api_key = _api_key(credential)
 
@@ -89,13 +120,66 @@ def get_embedder(
     dimensions: int | None = None,
     **kwargs: Any,
 ):
-    """Return an Agno Embedder instance (OpenAI-compatible by default)."""
+    """Return an Agno Embedder instance.
+
+    Local sentence-transformers fallback: when the provider is ``local`` and no
+    remote ``base_url``/``api_key`` is configured (mirroring the legacy Django
+    ``local_model_provider`` which ships ``shibing624/text2vec-base-chinese``
+    with no credential), we load the model directly via
+    ``SentenceTransformerEmbedder`` so embedding works without any API key.
+    """
+    credential = _coerce_credential(credential)
     p = _norm(provider)
     api_key = _api_key(credential)
     base_url = credential.get("base_url") or OPENAI_COMPAT_ENDPOINTS.get(p)
-    from agno.embedder.openai import OpenAIEmbedder
+
+    if p == "local" and not base_url and not api_key:
+        return _local_embedder(model_name or None, dimensions)
+
+    from agno.knowledge.embedder.openai import OpenAIEmbedder
 
     return OpenAIEmbedder(id=model_name, api_key=api_key, base_url=base_url, dimensions=dimensions, **kwargs)
+
+
+def _local_embedder(model_name: str | None = None, dimensions: int | None = None):
+    """Load (and cache) a local sentence-transformers embedder.
+
+    A configured local checkpoint path (``settings.local_embedding_model_path``)
+    takes priority over ``model_name`` and over the built-in default, so ops can
+    point at a pre-downloaded directory (e.g. a ModelScope snapshot). The output
+    dimension is auto-detected from the loaded checkpoint (e.g. 384 for
+    all-MiniLM-L6-v2) when not supplied, so storage and retrieval learn the
+    correct size. Instances are cached per model id so weights load once.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    model_id = settings.local_embedding_model_path or model_name or DEFAULT_LOCAL_EMBEDDING_MODEL
+    cached = _LOCAL_EMBEDDER_CACHE.get(model_id)
+    if cached is not None:
+        return cached
+    try:
+        from agno.knowledge.embedder.sentence_transformer import SentenceTransformerEmbedder
+    except ImportError as exc:  # pragma: no cover - dependency guard
+        raise RuntimeError(
+            "Local embedding requires the 'sentence-transformers' package. "
+            "Install it with: uv sync --extra embedding-local"
+        ) from exc
+    embedder = SentenceTransformerEmbedder(
+        id=model_id,
+        dimensions=dimensions or LOCAL_EMBEDDING_DIM,
+    )
+    # Auto-detect the real output dimension so callers get the correct size
+    # (the column is a variable-dimension pgvector, so this must be accurate).
+    if dimensions is None:
+        try:
+            actual = embedder.sentence_transformer_client.get_sentence_embedding_dimension()
+            if actual:
+                embedder.dimensions = actual
+        except Exception:
+            pass
+    _LOCAL_EMBEDDER_CACHE[model_id] = embedder
+    return embedder
 
 
 # --------------------------------------------------------------------------- #

@@ -148,7 +148,11 @@ class Embedding(AppTableBase, table=True):
     knowledge_id: UUID = Field()
     document_id: UUID = Field()
     paragraph_id: UUID = Field()
-    embedding: list = Field(sa_column=Column(Vector(1536)))
+    # Variable-dimension pgvector column (mirrors legacy Django VectorField
+    # ``db_type = "vector"``). Leaving the dimension unspecified lets models of
+    # any size (e.g. 384 for all-MiniLM-L6-v2, 768 for text2vec, 1536 for
+    # OpenAI) coexist, exactly like the shared Django schema.
+    embedding: list = Field(sa_column=Column(Vector()))
     search_vector: str = Field(sa_column=Column(TSVECTOR))
     meta: dict = Field(default={}, sa_column=Column(JSONB))
 

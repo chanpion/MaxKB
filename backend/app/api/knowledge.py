@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid as uuid_module
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
@@ -447,6 +448,10 @@ async def list_documents(
             data.tags = [
                 {"id": str(t.id), "name": f"{t.key}:{t.value}" if t.value else t.key} for t in tag_rows
             ]
+        # Keep status_meta.aggs in sync with the real paragraph count (the
+        # validator ran before the count was known).
+        if isinstance(data.status_meta, dict):
+            data.status_meta["aggs"] = [{"count": data.paragraph_count, "status": data.status[-1]}]
         records.append(data.model_dump())
     return DocumentPage(records=records, total=total or 0, current=current_page, size=page_size)
 
@@ -574,14 +579,36 @@ async def hit_test(
     from app.rag.embed import embed_texts, normalize_for_embedding
     from app.rag.retriever import PgVectorRetriever
 
+    credential_raw = embedding_model_row.credential or "{}"
+    try:
+        credential = json.loads(credential_raw) if isinstance(credential_raw, str) else credential_raw
+    except json.JSONDecodeError:
+        credential = {}
+    if not isinstance(credential, dict):
+        credential = {}
+    # The 'local' provider uses a sentence-transformers checkpoint with no API
+    # key, so skip the credential requirement for it.
+    if embedding_model_row.provider != "local" and not credential.get("api_key") and not credential.get("apiKey"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Embedding model '{embedding_model_row.name}' is missing API credential (api_key). "
+            f"Please configure it in the model settings.",
+        )
+
     dimensions = (embedding_model_row.meta or {}).get("dimensions")
-    vectors = await embed_texts(
-        embedding_model_row.provider,
-        embedding_model_row.model_name,
-        embedding_model_row.credential or {},
-        [normalize_for_embedding(body.query_text)],
-        dimensions=dimensions,
-    )
+    try:
+        vectors = await embed_texts(
+            embedding_model_row.provider,
+            embedding_model_row.model_name,
+            credential,
+            [normalize_for_embedding(body.query_text)],
+            dimensions=dimensions,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Vectorization failed — embedding model may be misconfigured or unreachable: {e}",
+        )
     if not vectors:
         return []
 
@@ -1162,32 +1189,118 @@ async def delete_problem(
 # ---------------------------------------------------------------------------
 
 
+@router.put("/{knowledge_id}/embedding")
 @router.post("/{knowledge_id}/embedding")
 async def trigger_embedding(
     knowledge_id: str,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    """Re-vectorize a knowledge base with its currently configured embedding model.
+
+    Marks every active document PENDING and (re)embeds its paragraphs using the
+    KB's embedding model — required after switching the embedding model. Embedding
+    runs asynchronously via arq when a worker is available, with a synchronous
+    inline fallback so it also works in a single-process dev setup.
+    """
+    from app.core.tasks import enqueue_ingest_paragraphs
+    from app.rag.pipeline import embed_paragraphs
+
     knowledge = await session.get(Knowledge, knowledge_id)
     if knowledge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge not found")
+
+    # Resolve the embedding model: prefer the KB's configured model.
+    embedding_model_row = None
+    if knowledge.embedding_model_id is not None:
+        candidate = await session.get(Model, knowledge.embedding_model_id)
+        if candidate is not None and candidate.model_type == "embedding":
+            embedding_model_row = candidate
+    if embedding_model_row is None:
+        emb_result = await session.execute(select(Model).where(Model.model_type == "embedding").limit(1))
+        embedding_model_row = emb_result.scalar_one_or_none()
+
+    embedding = None
+    if embedding_model_row is not None and embedding_model_row.model_type == "embedding":
+        embedding = {
+            "provider": embedding_model_row.provider,
+            "model_name": embedding_model_row.model_name,
+            "credential": resolve_credential(embedding_model_row.credential),
+            "dimensions": (embedding_model_row.meta or {}).get("dimensions"),
+        }
 
     result = await session.execute(
         select(Document).where(
             Document.knowledge_id == knowledge_id,
             Document.is_active == True,  # noqa: E712
-            Document.status.in_(["WAIT", "ERROR"]),
         )
     )
     documents = result.scalars().all()
 
+    pending: list[tuple[str, str | None]] = []
     for doc in documents:
         doc.status = "PENDING"
         doc.status_meta = {"step": "queued"}
-
+        pending.append((str(doc.id), str(current_user.id) if current_user.id is not None else None))
     await session.commit()
 
-    return {"result": True, "document_count": len(documents), "document_ids": [str(d.id) for d in documents]}
+    if embedding is None:
+        return {
+            "result": True,
+            "document_count": len(documents),
+            "document_ids": [d for d, _ in pending],
+            "warning": "No embedding model configured; documents left PENDING.",
+        }
+
+    embedded = 0
+    for document_id, user_id in pending:
+        enqueued = False
+        try:
+            await enqueue_ingest_paragraphs(
+                knowledge_id=str(knowledge_id),
+                document_id=document_id,
+                user_id=user_id,
+                embedding=embedding,
+            )
+            enqueued = True
+        except Exception:
+            enqueued = False
+        if enqueued:
+            embedded += 1
+            continue
+
+        # Inline fallback (no arq worker / redis unavailable): embed in-process.
+        try:
+            res = await embed_paragraphs(
+                session,
+                knowledge_id=str(knowledge_id),
+                document_id=document_id,
+                embedding=embedding,
+            )
+            doc = await session.get(Document, document_id)
+            if doc is not None:
+                doc.status = "SUCCESS"
+                doc.status_meta = {
+                    "step": "completed",
+                    "paragraph_count": res.paragraph_count,
+                    "embedding_count": res.embedding_count,
+                    "char_length": res.char_length,
+                }
+                await session.commit()
+            embedded += 1
+        except Exception as exc:
+            doc = await session.get(Document, document_id)
+            if doc is not None:
+                doc.status = "ERROR"
+                doc.status_meta = {"step": "error", "error": str(exc)[:500]}
+                await session.commit()
+
+    return {
+        "result": True,
+        "document_count": len(documents),
+        "document_ids": [d for d, _ in pending],
+        "embedded": embedded,
+    }
 
 
 # ---------------------------------------------------------------------------

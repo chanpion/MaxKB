@@ -9,6 +9,16 @@ from typing import Any
 from pydantic import model_validator
 from sqlmodel import SQLModel
 
+# Backend internal document status -> frontend 4-char stage code.
+# The UI treats the last char as the EMBEDDING stage (see utils/status.ts).
+_INTERNAL_DOC_STATUS_CODE = {
+    "WAIT": "0",
+    "PENDING": "0",
+    "INGESTING": "1",
+    "SUCCESS": "2",
+    "ERROR": "3",
+}
+
 # --- Knowledge ---
 
 
@@ -99,12 +109,30 @@ class DocumentOut(SQLModel):
     tags: list[Any] = []
 
     @model_validator(mode="after")
-    def _strip_meta_paragraphs(self) -> "DocumentOut":
+    def _enrich(self) -> "DocumentOut":
         # Paragraphs are persisted as independent Paragraph rows, never inside
         # document.meta. Drop any legacy `paragraphs` payload to keep list/detail
         # responses lean (it previously bloated the document list with full text).
         if isinstance(self.meta, dict) and "paragraphs" in self.meta:
             self.meta = {k: v for k, v in self.meta.items() if k != "paragraphs"}
+
+        # The frontend `Status`/`StatusTable` components parse `status` as a
+        # 4-char stage code (EMBEDDING, GENERATE_PROBLEM, SYNC, TOKENIZE),
+        # reversed, where '0'=PENDING '1'=STARTED '2'=SUCCESS '3'=FAILURE
+        # 'n'=ignored — exactly the legacy Django "nnn2" format. The backend
+        # stores a human-readable status ("WAIT"/"INGESTING"/"SUCCESS"/"ERROR"),
+        # so map it to the char code the UI expects.
+        code = _INTERNAL_DOC_STATUS_CODE.get(self.status or "WAIT", "0")
+        self.status = "nnn" + code
+
+        meta = self.status_meta or {}
+        if "aggs" not in meta:
+            meta = {
+                **meta,
+                "aggs": [{"count": self.paragraph_count, "status": code}],
+                "state_time": meta.get("state_time") or {},
+            }
+            self.status_meta = meta
         return self
 
 

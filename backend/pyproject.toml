@@ -40,6 +40,11 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.6",
 ]
+# Local embedding model (shibing624/text2vec-base-chinese) via sentence-transformers.
+# Not included by default to keep the base image lean; install with: uv sync --extra embedding-local
+embedding-local = [
+    "sentence-transformers>=2.3",
+]
 # Optional SDKs for the multimedia workflow nodes (image/tts/stt/video/ttv/mcp).
 # Not required for the base service; install with `uv sync --extra multimedia`.
 multimedia = [

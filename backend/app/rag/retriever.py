@@ -14,12 +14,14 @@ from typing import Any
 
 from sqlalchemy import Engine
 
+from app.core.db import engine as db_engine
+
 _SQL_EMBEDDING = """
 WITH vector_top AS (
-    SELECT e.id, e.paragraph_id, (e.embedding::vector($1) <=> $2::vector) AS distance
+    SELECT e.id, e.paragraph_id, (e.embedding <=> $2::vector) AS distance
     FROM embedding e
     WHERE e.knowledge_id::text = ANY($6::text[]) AND e.is_active = TRUE
-    ORDER BY (e.embedding::vector($1) <=> $2::vector)
+    ORDER BY (e.embedding <=> $2::vector)
     LIMIT LEAST($3 * 10, 500)
 )
 SELECT p.id AS paragraph_id, p.content, p.title, (1 - vc.distance) AS similarity
@@ -33,10 +35,10 @@ LIMIT $5
 
 _SQL_BLEND = """
 WITH vector_top AS (
-    SELECT e.id, e.paragraph_id, (e.embedding::vector($1) <=> $2::vector) AS distance
+    SELECT e.id, e.paragraph_id, (e.embedding <=> $2::vector) AS distance
     FROM embedding e
     WHERE e.knowledge_id::text = ANY($6::text[]) AND e.is_active = TRUE
-    ORDER BY (e.embedding::vector($1) <=> $2::vector)
+    ORDER BY (e.embedding <=> $2::vector)
     LIMIT LEAST($3 * 10, 500)
 )
 SELECT p.id AS paragraph_id, p.content, p.title,
@@ -72,7 +74,7 @@ class PgVectorRetriever:
     """
 
     def __init__(self, engine: Engine | None = None) -> None:
-        self._engine = engine or engine
+        self._engine = engine or db_engine
 
     async def search(
         self,
@@ -94,7 +96,6 @@ class PgVectorRetriever:
                 raise ValueError("blend search requires a query embedding")
             sql = _SQL_BLEND
             params = (
-                len(query_embedding),
                 json.dumps(list(query_embedding)),
                 top_n,
                 similarity,
@@ -107,7 +108,6 @@ class PgVectorRetriever:
                 raise ValueError("embedding search requires a query embedding")
             sql = _SQL_EMBEDDING
             params = (
-                len(query_embedding),
                 json.dumps(list(query_embedding)),
                 top_n,
                 similarity,

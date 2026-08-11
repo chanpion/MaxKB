@@ -117,7 +117,7 @@ async def embed_texts(
     embedder = get_embedder(provider, model_name, credential, dimensions=dimensions)
 
     def _run() -> list[list[float]]:
-        # Agno embedders expose ``embed(documents=...)``; fall back to per-doc.
+        # Agno 2.x embedders expose ``get_embedding(text)``; try embed() first for compat.
         if hasattr(embedder, "embed"):
             try:
                 result = embedder.embed(documents=list(texts))
@@ -125,8 +125,24 @@ async def embed_texts(
                     return [list(map(float, v)) for v in result]
             except TypeError:
                 pass
-        if hasattr(embedder, "embed_query"):
-            return [list(map(float, embedder.embed_query(t))) for t in texts]
-        raise RuntimeError("Embedder exposes neither embed() nor embed_query()")
+        if hasattr(embedder, "get_embedding"):
+            out = []
+            errors: list[str] = []
+            for t in texts:
+                try:
+                    vec = embedder.get_embedding(t)
+                except Exception as exc:
+                    errors.append(f"get_embedding('{t[:50]}...') raised: {exc}")
+                    continue
+                if vec:
+                    out.append(list(map(float, vec)))
+                else:
+                    errors.append(f"get_embedding('{t[:50]}...') returned None (check API key / endpoint)")
+            if not out and errors:
+                raise RuntimeError(
+                    f"Embedding failed for all {len(texts)} text(s): {'; '.join(errors[:3])}"
+                )
+            return out
+        raise RuntimeError("Embedder exposes neither embed() nor get_embedding()")
 
     return await asyncio.to_thread(_run)

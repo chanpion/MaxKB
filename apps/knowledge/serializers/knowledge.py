@@ -1382,6 +1382,8 @@ class KnowledgeSerializer(serializers.Serializer):
                 raise AppApiException(500, _("Knowledge id does not exist"))
             if not QuerySet(Knowledge).filter(id=self.data.get("knowledge_id")).exists():
                 raise AppApiException(300, _("id does not exist"))
+            if not query_set.filter(embedding_model__isnull=False).exists():
+                raise AppApiException(500, _("Embedding model is not configured for this knowledge base"))
 
         def hit_test(self):
             self.is_valid()

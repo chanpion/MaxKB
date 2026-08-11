@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     local_model_protocol: str = Field(default="http", alias="MAXKB_LOCAL_MODEL_PROTOCOL")
     local_model_host_worker: int = Field(default=1, alias="MAXKB_LOCAL_MODEL_HOST_WORKER")
 
+    # --- Local embedding model (sentence-transformers) ---
+    # Checkpoint used by the ``local`` embedding provider when no API key /
+    # base_url is supplied. A local directory (e.g. a ModelScope snapshot) takes
+    # priority over the built-in HuggingFace default. Empty = built-in default.
+    local_embedding_model_path: str = Field(
+        default="",
+        alias="MAXKB_LOCAL_EMBEDDING_MODEL_PATH",
+        description="Local sentence-transformers checkpoint (dir or HF id) for the 'local' embedding provider.",
+    )
+
     # --- General ---
     debug: bool = Field(default=False, alias="MAXKB_DEBUG")
     web_host: str = Field(default="0.0.0.0", alias="MAXKB_WEB_HOST")

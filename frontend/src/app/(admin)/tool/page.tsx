@@ -1,110 +1,297 @@
 'use client'
-import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Row, Col, Select, Button, Card, Typography, Empty, Spin, Tag, Modal, Form, Input, message} from 'antd'
-import {HomeOutlined, ToolOutlined, PlusOutlined, DeleteOutlined} from '@ant-design/icons'
-import FolderVirtualizedTree from '@/components/folder-virtualized-tree/FolderVirtualizedTree'
-import {SourceTypeEnum} from '@/enums/common'
-import {useFolderStore, useUserStore} from '@/store'
-import {useTranslations} from 'next-intl'
+import React, {useCallback, useEffect, useRef, useState} from 'react'
+import {Button, Card, Dropdown, Empty, Input, Menu, Select, Space, Table, Tag, message, Typography, Tree, Modal} from 'antd'
+import type {ColumnsType} from 'antd/es/table'
+import {
+  PlusOutlined,
+  MoreOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  BugOutlined,
+  AppstoreOutlined,
+  FolderOutlined,
+  SearchOutlined,
+  ApartmentOutlined,
+} from '@ant-design/icons'
+import {useUserStore} from '@/store'
+import {useRouter} from '@/i18n/navigation'
 import {toolApi} from '@/lib/api/tool/tool'
+import ToolFormDrawer from './components/ToolFormDrawer'
+import McpToolFormDrawer from './components/McpToolFormDrawer'
+import ToolDebugDrawer from './components/ToolDebugDrawer'
+import {useTranslations} from 'next-intl'
+
+const TYPE_TAG: Record<string, {color: string; label: string}> = {
+  FUNCTION: {color: 'blue', label: '函数'},
+  SKILL: {color: 'purple', label: '技能'},
+  MCP: {color: 'green', label: 'MCP'},
+  DATA_SOURCE: {color: 'orange', label: '数据源'},
+}
+
+interface ToolRow {
+  id: string
+  name: string
+  desc?: string
+  tool_type: string
+  is_active?: boolean
+}
 
 export default function ToolPage() {
   const t = useTranslations('menu')
-  const folder = useFolderStore()
-  const user = useUserStore()
-  const [toolList, setToolList] = useState<any[]>([])
+  const router = useRouter()
+  const workspaceId = useUserStore((s) => s.getWorkspaceId?.() || s.workspace_id || 'default')
+  const [tools, setTools] = useState<ToolRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [size, setSize] = useState(10)
   const [loading, setLoading] = useState(false)
-  const [toolType, setToolType] = useState<string>('')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [form] = Form.useForm()
+  const [typeFilter, setTypeFilter] = useState<string | undefined>()
+  const [folderTree, setFolderTree] = useState<any[]>([])
+  const [selectedKeys, setSelectedKeys] = useState<string[]>(['all'])
+  const [keyword, setKeyword] = useState('')
 
-  const breadcrumbItems = [
-    {title: <><HomeOutlined /> {t('home')}</>},
-    {title: <><ToolOutlined /> {folder.currentFolder?.name || t('tool')}</>},
-  ]
+  const [formOpen, setFormOpen] = useState(false)
+  const [mcpOpen, setMcpOpen] = useState(false)
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [debugTool, setDebugTool] = useState<any>(null)
+  const selectedRowKeys = useRef<string[]>([])
 
-  const loadTools = () => {
+  const currentFolderId = selectedKeys[0] === 'all' ? undefined : selectedKeys[0]
+
+  const loadTools = useCallback(() => {
     setLoading(true)
-    const params: any = {folder_id: folder.currentFolder?.id || user.getWorkspaceId()}
-    if (toolType) params.tool_type = toolType
-    toolApi.getToolList(params).then((res: any) => {
-      setToolList(res.data?.tools || res.data || [])
-    }).catch(() => {}).finally(() => setLoading(false))
+    const params: any = {page, size, workspace_id: workspaceId, folder_id: currentFolderId, name: keyword || undefined, tool_type: typeFilter}
+    toolApi
+      .getToolList(params)
+      .then((res: any) => {
+        const data = res?.data ?? res
+        const list = (data?.list || []).map((it: any) => ({
+          id: it.id,
+          name: it.name,
+          desc: it.desc,
+          tool_type: it.tool_type || 'FUNCTION',
+          is_active: it.is_active,
+        }))
+        setTools(list)
+        setTotal(data?.total ?? list.length)
+      })
+      .catch(() => message.error('加载工具失败'))
+      .finally(() => setLoading(false))
+  }, [page, size, workspaceId, currentFolderId, keyword, typeFilter])
+
+  const loadFolders = useCallback(() => {
+    toolApi
+      .getFolder(workspaceId)
+      .then((res: any) => {
+        const raw = Array.isArray(res?.data) ? res.data : res?.data?.records || []
+        const toNode = (f: any): any => ({
+          key: f.id,
+          title: f.name,
+          icon: <FolderOutlined />,
+          children: f.children?.length ? f.children.map(toNode) : undefined,
+        })
+        setFolderTree([{key: 'all', title: '全部工具', icon: <AppstoreOutlined />}, ...raw.map(toNode)])
+      })
+      .catch(() => {})
+  }, [workspaceId])
+
+  useEffect(() => {
+    loadFolders()
+  }, [loadFolders])
+
+  useEffect(() => {
+    loadTools()
+  }, [loadTools])
+
+  const handleSelect = (keys: any[]) => {
+    if (keys.length) setSelectedKeys(keys)
   }
 
-  useEffect(() => { loadTools() }, [folder.currentFolder?.id, toolType])
+  const openCreate = (type: 'FUNCTION' | 'MCP' | 'SKILL' | 'DATA_SOURCE') => {
+    setEditing(null)
+    if (type === 'MCP') setMcpOpen(true)
+    else {
+      // 预置类型后打开通用表单
+      setEditing({tool_type: type})
+      setFormOpen(true)
+    }
+  }
 
-  const handleCreate = () => {
-    form.validateFields().then((values) => {
-      toolApi.postTool({...values, folder_id: folder.currentFolder?.id || user.getWorkspaceId()})
-        .then(() => { message.success('创建成功'); setCreateOpen(false); form.resetFields(); loadTools() })
-        .catch(() => {})
+  const openEdit = (row: ToolRow) => {
+    toolApi
+      .getToolDetail(row.id)
+      .then((res: any) => {
+        const full = res?.data ?? res
+        setEditing(full)
+        if (full.tool_type === 'MCP') setMcpOpen(true)
+        else setFormOpen(true)
+      })
+      .catch(() => message.error('加载详情失败'))
+  }
+
+  const handleDelete = (row: ToolRow) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `删除工具「${row.name}」？`,
+      okText: '删除',
+      okButtonProps: {danger: true},
+      onOk: () =>
+        toolApi
+          .delTool(row.id)
+          .then(() => {
+            message.success('已删除')
+            loadTools()
+          })
+          .catch((e: any) => message.error(e?.message || '删除失败')),
     })
   }
 
-  const handleDelete = (id: string, name: string) => {
-    Modal.confirm({title: '确认删除', content: `确认删除工具「${name}」？`,
-      onOk: () => toolApi.delTool(id).then(() => { message.success('删除成功'); loadTools() }),
+  const handleBatchDelete = () => {
+    const ids = selectedRowKeys.current
+    if (!ids.length) return message.warning('请先选择工具')
+    Modal.confirm({
+      title: '批量删除',
+      content: `确认删除选中的 ${ids.length} 个工具？`,
+      okText: '删除',
+      okButtonProps: {danger: true},
+      onOk: () =>
+        toolApi
+          .batchDelete(ids)
+          .then(() => {
+            message.success('已删除')
+            selectedRowKeys.current = []
+            loadTools()
+          })
+          .catch((e: any) => message.error(e?.message || '删除失败')),
     })
   }
 
-  const toolTypeOptions = [
-    {value: '', label: '全部'},
-    {value: 'CUSTOM', label: '工具'},
-    {value: 'SKILL', label: 'Skills'},
-    {value: 'WORKFLOW', label: '工作流'},
-    {value: 'MCP', label: 'MCP'},
-    {value: 'DATA_SOURCE', label: '数据源'},
+  const columns: ColumnsType<ToolRow> = [
+    {
+      title: '名称',
+      dataIndex: 'name',
+      render: (name, row) => (
+        <Space>
+          <span className="font-medium">{name}</span>
+          <Tag color={TYPE_TAG[row.tool_type]?.color}>{TYPE_TAG[row.tool_type]?.label}</Tag>
+        </Space>
+      ),
+    },
+    {title: '描述', dataIndex: 'desc', ellipsis: true, render: (v) => v || <Typography.Text type="secondary">—</Typography.Text>},
+    {
+      title: '状态',
+      dataIndex: 'is_active',
+      width: 90,
+      render: (v) => (v ? <Tag color="success">启用</Tag> : <Tag>停用</Tag>),
+    },
+    {
+      title: '操作',
+      width: 140,
+      render: (_, row) => (
+        <Space size={4}>
+          <Button type="text" size="small" icon={<BugOutlined />} onClick={() => {setDebugTool(row); setDebugOpen(true)}} />
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)} />
+          <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(row)} />
+        </Space>
+      ),
+    },
   ]
+
+  const newMenu = (
+    <Menu
+      items={[
+        {key: 'FUNCTION', label: '函数工具', onClick: () => openCreate('FUNCTION')},
+        {key: 'MCP', label: 'MCP 工具', onClick: () => openCreate('MCP')},
+        {key: 'SKILL', label: '技能工具', onClick: () => openCreate('SKILL')},
+        {key: 'DATA_SOURCE', label: '数据源', onClick: () => openCreate('DATA_SOURCE')},
+      ]}
+    />
+  )
 
   return (
-    <div style={{display: 'flex', gap: 16, height: 'calc(100vh - 56px - 48px)'}}>
-      <div style={{width: 240, overflow: 'auto', background: '#fff', borderRadius: 8, padding: 8, flexShrink: 0, display: 'flex', flexDirection: 'column'}}>
-        <div style={{padding: '8px 8px 4px', fontWeight: 500, fontSize: 14}}>{t('tool')}</div>
-        <FolderVirtualizedTree source={SourceTypeEnum.TOOL} />
-      </div>
-      <div style={{flex: 1, overflow: 'auto', background: '#fff', borderRadius: 8, padding: 16}}>
-        <Breadcrumb items={breadcrumbItems} style={{marginBottom: 16}} />
-        <div style={{display: 'flex', alignItems: 'center', marginBottom: 16, gap: 8}}>
-          <Select value={toolType} onChange={setToolType} style={{width: 120}} options={toolTypeOptions} />
-          <Button type="primary" icon={<PlusOutlined />} style={{marginLeft: 'auto'}} onClick={() => setCreateOpen(true)}>
-            添加工具
+    <div>
+      <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+        <Typography.Title level={4} style={{margin: 0}}>
+          工具
+        </Typography.Title>
+        <Space>
+          <Button icon={<ApartmentOutlined />} onClick={() => router.push('/tool/tool-store')}>
+            工具库
           </Button>
-        </div>
-        {loading ? (
-          <div style={{textAlign: 'center', padding: 60}}><Spin /></div>
-        ) : toolList.length === 0 ? (
-          <Empty description="暂无工具" />
-        ) : (
-          <Row gutter={[16, 16]}>
-            {toolList.map((item: any) => (
-              <Col key={item.id} xs={24} sm={12} md={12} lg={8} xl={6}>
-                <Card hoverable style={{borderRadius: 8}}
-                  title={<div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <ToolOutlined style={{fontSize: 18, color: '#1677FF'}} />
-                    <Typography.Text ellipsis>{item.name}</Typography.Text>
-                  </div>}
-                  extra={<Tag>{item.tool_type || 'CUSTOM'}</Tag>}
-                  actions={[<DeleteOutlined key="del" onClick={() => handleDelete(item.id, item.name)} />]}>
-                  <Typography.Paragraph ellipsis={{rows: 2}} type="secondary" style={{marginBottom: 0, minHeight: 40}}>
-                    {item.desc || '暂无描述'}
-                  </Typography.Paragraph>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        )}
+          <Button danger disabled={!selectedRowKeys.current.length} onClick={handleBatchDelete}>
+            批量删除
+          </Button>
+          <Dropdown overlay={newMenu} trigger={['click']}>
+            <Button type="primary" icon={<PlusOutlined />}>
+              新建工具
+            </Button>
+          </Dropdown>
+        </Space>
       </div>
-      <Modal title="添加工具" open={createOpen} onOk={handleCreate} onCancel={() => setCreateOpen(false)}>
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="工具名称" rules={[{required: true, message: '请输入名称'}]}>
-            <Input placeholder="请输入工具名称" />
-          </Form.Item>
-          <Form.Item name="desc" label="描述">
-            <Input.TextArea rows={3} placeholder="请输入描述" />
-          </Form.Item>
-        </Form>
-      </Modal>
+
+      <div style={{display: 'flex', gap: 16, alignItems: 'stretch'}}>
+        <Card style={{width: 240, borderRadius: 8}} bodyStyle={{padding: 8, height: 'calc(100vh - 200px)', overflow: 'auto'}}>
+          <Tree
+            treeData={folderTree}
+            selectedKeys={selectedKeys}
+            onSelect={handleSelect}
+            defaultExpandAll
+            blockNode
+          />
+        </Card>
+
+        <Card style={{flex: 1, borderRadius: 8}} bodyStyle={{padding: 12}}>
+          <Space style={{marginBottom: 12, width: '100%', justifyContent: 'space-between'}}>
+            <Input
+              allowClear
+              prefix={<SearchOutlined />}
+              placeholder="搜索工具名称"
+              style={{width: 260}}
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+            />
+            <Select
+              allowClear
+              placeholder="按类型筛选"
+              style={{width: 180}}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                {value: 'FUNCTION', label: '函数工具'},
+                {value: 'MCP', label: 'MCP 工具'},
+                {value: 'SKILL', label: '技能工具'},
+                {value: 'DATA_SOURCE', label: '数据源'},
+              ]}
+            />
+          </Space>
+
+          <Table
+            rowKey="id"
+            loading={loading}
+            columns={columns}
+            dataSource={tools}
+            rowSelection={{
+              onChange: (keys) => (selectedRowKeys.current = keys as string[]),
+            }}
+            pagination={{
+              current: page,
+              pageSize: size,
+              total,
+              showSizeChanger: true,
+              onChange: (p, s) => {
+                setPage(p)
+                setSize(s)
+              },
+            }}
+            locale={{emptyText: <Empty description="暂无工具" />}}
+          />
+        </Card>
+      </div>
+
+      <ToolFormDrawer open={formOpen} tool={editing} folderId={currentFolderId} onClose={() => setFormOpen(false)} onSaved={loadTools} />
+      <McpToolFormDrawer open={mcpOpen} tool={editing} folderId={currentFolderId} onClose={() => setMcpOpen(false)} onSaved={loadTools} />
+      <ToolDebugDrawer open={debugOpen} tool={debugTool} onClose={() => setDebugOpen(false)} />
     </div>
   )
 }

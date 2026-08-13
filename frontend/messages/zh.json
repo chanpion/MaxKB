@@ -20,6 +20,7 @@
     "model": "模型",
     "application": "智能体",
     "tool": "工具",
+    "toolStore": "工具库",
     "trigger": "触发器",
     "system": "系统管理"
   },

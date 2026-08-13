@@ -27,6 +27,7 @@ export default function AppOverviewPage() {
     {key: 'overview', label: '概览'},
     {key: 'setting', label: '设置'},
     {key: 'access', label: '访问'},
+    {key: 'chat', label: '体验'},
     {key: 'chat-log', label: '聊天日志'},
   ]
 

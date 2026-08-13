@@ -1,0 +1,11 @@
+<svg width="100%" height="100%" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+	<defs>
+		<linearGradient id="qwenGrad" x1="0" y1="0" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#7B5CFF" />
+			<stop offset="1" stop-color="#3C7BFF" />
+		</linearGradient>
+	</defs>
+	<rect x="3" y="3" width="44" height="44" rx="12" fill="url(#qwenGrad)" />
+	<path d="M31 16C31 12 26 11 22 14C18 17 19 22 23 25L23 29" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+	<circle cx="23" cy="35" r="2.4" fill="#FFFFFF" />
+</svg>

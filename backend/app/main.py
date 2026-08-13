@@ -18,6 +18,7 @@ from app.api.health import router as health_router
 from app.api.homepage import router as homepage_router
 from app.api.knowledge import router as knowledge_router
 from app.api.locales import router as locales_router
+from app.api.models import provider_router
 from app.api.models import router as model_router
 from app.api.oss import router as oss_router
 from app.api.system import router as system_router
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(homepage_router)
     app.include_router(knowledge_router)
     app.include_router(model_router)
+    app.include_router(provider_router)
     app.include_router(oss_router)
     app.include_router(application_router)
     app.include_router(chat_router)

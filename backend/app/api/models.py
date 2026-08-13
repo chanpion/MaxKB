@@ -68,42 +68,48 @@ async def provider_model_type_list(
     return [{"key": MODEL_TYPE_LABELS.get(t, t), "value": t} for t in types]
 
 
-# Known model names per provider/model_type combo
+# Known model names per provider/model_type combo. Keys match the legacy
+# ``model_<vendor>_provider`` ids used in PROVIDER_CATALOG.
 _MODEL_NAMES: dict[str, dict[str, list[str]]] = {
-    "openai": {
+    "model_openai_provider": {
         "LLM": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o3-mini", "o1"],
         "EMBEDDING": ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"],
     },
-    "deepseek": {
+    "model_deepseek_provider": {
         "LLM": ["deepseek-chat", "deepseek-reasoner"],
         "EMBEDDING": ["deepseek-text-embedding"],
     },
-    "qwen": {
+    "model_qwen_provider": {
         "LLM": ["qwen-max", "qwen-plus", "qwen-turbo", "qwen2.5-72b-instruct", "qwq-32b"],
         "EMBEDDING": ["text-embedding-v3"],
         "TTS": ["cosyvoice-v1", "sambert-zhichu-v1"],
     },
-    "zhipu": {
+    "model_zhipu_provider": {
         "LLM": ["glm-4-plus", "glm-4-flash", "glm-4-air"],
         "EMBEDDING": ["embedding-3"],
     },
-    "anthropic": {"LLM": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]},
-    "kimi": {"LLM": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]},
-    "ollama": {"LLM": [], "EMBEDDING": []},
-    "xunfei": {
+    "model_anthropic_provider": {
+        "LLM": ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]
+    },
+    "model_kimi_provider": {"LLM": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]},
+    "model_ollama_provider": {"LLM": [], "EMBEDDING": []},
+    "model_xunfei_provider": {
         "LLM": ["spark-lite", "spark-v4.0", "spark-max"],
         "TTS": ["tts-xunfei-v1"],
         "STT": ["stt-xunfei-v1"],
     },
-    "tencent": {
+    "model_tencent_provider": {
         "LLM": ["hunyuan-turbos-latest", "hunyuan-lite"],
         "EMBEDDING": ["hunyuan-embedding"],
     },
-    "volcanic": {
+    "model_volcanic_provider": {
         "LLM": ["doubao-pro-256k", "doubao-lite-128k"],
         "EMBEDDING": ["doubao-embedding"],
     },
-    "local": {"LLM": [], "EMBEDDING": []},
+    "model_local_provider": {"LLM": [], "EMBEDDING": []},
+    "model_xinference_provider": {"LLM": [], "EMBEDDING": []},
+    "model_vllm_provider": {"LLM": [], "EMBEDDING": []},
+    "model_docker_ai_provider": {"LLM": [], "EMBEDDING": []},
 }
 
 
@@ -122,34 +128,32 @@ async def provider_model_list(
 async def provider_model_params_form(
     body: dict,
     _: User = Depends(get_current_user),
-) -> dict:
-    """Return credential form + model params form for a provider/model_type/model_name."""
+) -> list[dict]:
+    """Return the model params form for a provider/model_type/model_name.
+
+    The legacy frontend (``/provider/model_params_form``) expects a flat array
+    of ``FormField`` definitions, exactly like Django's
+    ``get_default_model_params_setting(...)`` (``to_form_list()``).
+    """
     provider_name = body.get("provider", "")
     provider_meta = PROVIDER_CATALOG.get(provider_name, {})
-    return {
-        "credential_form": provider_meta.get("credential_form", []),
-        "model_params_form": {},
-    }
+    return provider_meta.get("model_params_form", [])
 
 
 @router.post("/providers/model_form")
 async def provider_model_form(
     body: dict,
     _: User = Depends(get_current_user),
-) -> dict:
-    """Return the complete model creation form metadata for a provider."""
+) -> list[dict]:
+    """Return the model creation credential form for a provider.
+
+    The legacy frontend (``/provider/model_form``) expects a flat array of
+    credential ``FormField`` definitions, exactly like Django's
+    ``get_model_credential(...).to_form_list()``.
+    """
     provider_name = body.get("provider", "")
-    model_type = body.get("model_type", "")
     provider_meta = PROVIDER_CATALOG.get(provider_name, {})
-    model_names = _MODEL_NAMES.get(provider_name, {}).get(model_type, [])
-    return {
-        "provider": provider_name,
-        "name": provider_meta.get("name", ""),
-        "model_type": model_type,
-        "model_list": model_names,
-        "credential_form": provider_meta.get("credential_form", []),
-        "model_params_form": {},
-    }
+    return provider_meta.get("credential_form", [])
 
 
 @router.get("/providers/model_params_form")
@@ -158,13 +162,10 @@ async def provider_model_params_form_get(
     model_type: str = Query(...),
     model_name: str = Query(...),
     _: User = Depends(get_current_user),
-) -> dict:
+) -> list[dict]:
     """GET variant of model params form (legacy frontend)."""
     provider_meta = PROVIDER_CATALOG.get(provider, {})
-    return {
-        "credential_form": provider_meta.get("credential_form", []),
-        "model_params_form": {},
-    }
+    return provider_meta.get("model_params_form", [])
 
 
 @router.get("/providers/model_form")
@@ -173,18 +174,84 @@ async def provider_model_form_get(
     model_type: str = Query(...),
     model_name: str = Query(...),
     _: User = Depends(get_current_user),
-) -> dict:
-    """GET variant of model creation form (legacy frontend)."""
+) -> list[dict]:
+    """GET variant of model creation form (legacy frontend).
+
+    Returns the credential ``FormField`` array so the frontend's
+    ``DynamicsForm`` can render the URL / API key inputs.
+    """
     provider_meta = PROVIDER_CATALOG.get(provider, {})
-    model_names = _MODEL_NAMES.get(provider, {}).get(model_type, [])
-    return {
-        "provider": provider,
-        "name": provider_meta.get("name", ""),
-        "model_type": model_type,
-        "model_list": model_names,
-        "credential_form": provider_meta.get("credential_form", []),
-        "model_params_form": {},
-    }
+    return provider_meta.get("credential_form", [])
+
+
+# ---------------------------------------------------------------------------
+# Legacy-compatible ``/provider`` routes
+#
+# The frontend calls ``/provider/...`` (rewritten by the path-rewrite middleware
+# to ``/api/provider/...``). These mirror the ``/api/model/providers/...`` routes
+# above but live under the path the legacy frontend actually requests.
+# ---------------------------------------------------------------------------
+
+provider_router = APIRouter(prefix="/api/provider", tags=["provider"])
+
+
+@provider_router.get("", response_model=list[ProviderInfo])
+async def legacy_provider_list(
+    model_type: str | None = Query(None),
+    _: User = Depends(get_current_user),
+) -> list[ProviderInfo]:
+    """Catalog of supported providers (legacy frontend path ``/provider``)."""
+    providers = [ProviderInfo(**p) for p in list_providers()]
+    if model_type:
+        providers = [p for p in providers if model_type in (p.model_types or [])]
+    return providers
+
+
+@provider_router.get("/model_type_list")
+async def legacy_provider_model_type_list(
+    provider: str | None = Query(None),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    return await provider_model_type_list(provider, _)
+
+
+@provider_router.get("/model_list")
+async def legacy_provider_model_list(
+    provider: str = Query(...),
+    model_type: str = Query(...),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    return await provider_model_list(provider, model_type, _)
+
+
+@provider_router.post("/model_params_form")
+async def legacy_provider_model_params_form(body: dict, _: User = Depends(get_current_user)) -> dict:
+    return await provider_model_params_form(body, _)
+
+
+@provider_router.get("/model_params_form")
+async def legacy_provider_model_params_form_get(
+    provider: str = Query(...),
+    model_type: str = Query(...),
+    model_name: str = Query(...),
+    _: User = Depends(get_current_user),
+) -> dict:
+    return await provider_model_params_form_get(provider, model_type, model_name, _)
+
+
+@provider_router.post("/model_form")
+async def legacy_provider_model_form(body: dict, _: User = Depends(get_current_user)) -> dict:
+    return await provider_model_form(body, _)
+
+
+@provider_router.get("/model_form")
+async def legacy_provider_model_form_get(
+    provider: str = Query(...),
+    model_type: str = Query(...),
+    model_name: str = Query(...),
+    _: User = Depends(get_current_user),
+) -> dict:
+    return await provider_model_form_get(provider, model_type, model_name, _)
 
 
 # ---------------------------------------------------------------------------

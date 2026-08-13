@@ -62,8 +62,19 @@ _LOCAL_EMBEDDER_CACHE: dict[str, Any] = {}
 
 
 def _norm(provider: str) -> str:
-    """Normalize 'model_provider.openai' / 'OPENAI' -> 'openai'."""
-    return (provider or "").split(".")[-1].lower()
+    """Normalize a provider id to its vendor key.
+
+    Handles three representations that may be stored on a model:
+      * ``openai``                         -> ``openai``
+      * ``model_provider.openai``          -> ``openai``  (legacy dotted form)
+      * ``model_openai_provider``          -> ``openai``  (UI catalog id)
+    """
+    p = (provider or "").split(".")[-1].lower()
+    if p.startswith("model_"):
+        p = p[len("model_"):]
+    if p.endswith("_provider"):
+        p = p[: -len("_provider")]
+    return p
 
 
 def _coerce_credential(credential: Any) -> dict:

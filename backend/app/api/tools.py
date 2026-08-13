@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.folder_tree import build_folder_tree, is_root_folder
 from app.core.db import get_session
 from app.core.security import get_current_user
 from app.models.tool import Tool, ToolFolder, ToolWorkflow, ToolWorkflowVersion
@@ -33,16 +34,21 @@ router = APIRouter(prefix="/api/tool", tags=["tool"])
 
 
 # ----------------------------- folders ----------------------------------- #
-@router.get("/folder", response_model=list[ToolFolderOut])
+@router.get("/folder", response_model=list[dict])
 async def list_tool_folders(
     workspace_id: str = "default",
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
-) -> list[ToolFolderOut]:
+) -> list[dict]:
+    """Folder tree for the tool page sidebar.
+
+    Returns a single tree rooted at a synthetic ``根目录`` node (id == workspace
+    id) with the real folders nested underneath, matching the Django backend.
+    """
     result = await session.execute(
         select(ToolFolder).where(ToolFolder.workspace_id == workspace_id).order_by(ToolFolder.lft.asc())
     )
-    return [ToolFolderOut.model_validate(f) for f in result.scalars().all()]
+    return build_folder_tree(result.scalars().all(), workspace_id)
 
 
 @router.post("/folder", response_model=ToolFolderOut, status_code=status.HTTP_201_CREATED)
@@ -71,11 +77,13 @@ async def list_tools(
     size: int = 10,
     folder_id: str | None = None,
     is_active: bool | None = None,
+    workspace_id: str = "default",
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> ToolPage:
     conditions = []
-    if folder_id is not None:
+    # Selecting the synthetic root (根目录) returns all workspace tools.
+    if folder_id is not None and not is_root_folder(folder_id, workspace_id):
         conditions.append(Tool.folder_id == folder_id)
     if is_active is not None:
         conditions.append(Tool.is_active == is_active)
@@ -121,7 +129,8 @@ async def list_tools_by_type(
     if scope:
         workspace_conds.append(Tool.scope == scope)
     workspace_conds.extend(type_conds)
-    if folder_id:
+    # Selecting the synthetic root (根目录) returns all workspace tools.
+    if folder_id and not is_root_folder(folder_id, workspace_id):
         workspace_conds.append(Tool.folder_id == folder_id)
 
     result = await session.execute(select(Tool).where(*workspace_conds).order_by(Tool.create_time.desc()))

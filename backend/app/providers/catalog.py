@@ -13,11 +13,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.providers.icons import get_icon
+
 
 def _field(
     field: str,
     label: str,
-    input_type: str = "password",
+    input_type: str = "PasswordInput",
     required: bool = True,
     default: str = "",
     props: dict[str, Any] | None = None,
@@ -40,90 +42,143 @@ _TTI = "TTI"
 _TTS = "TTS"
 _STT = "STT"
 
+# Keys use the legacy ``model_<vendor>_provider`` convention so the frontend's
+# private/public folder split (which matches against those exact ids) works.
 PROVIDER_CATALOG: dict[str, dict[str, Any]] = {
-    "openai": {
+    "model_openai_provider": {
         "name": "OpenAI",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "api_key",
         "base_url": "https://api.openai.com/v1",
         "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False,
+                   default="https://api.openai.com/v1"),
             _field("api_key", "API Key"),
         ],
     },
-    "anthropic": {
+    "model_anthropic_provider": {
         "name": "Anthropic",
         "model_types": [_LLM],
         "auth_type": "api_key",
         "base_url": "https://api.anthropic.com",
-        "credential_form": [_field("api_key", "API Key")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False, default="https://api.anthropic.com"),
+            _field("api_key", "API Key"),
+        ],
     },
-    "deepseek": {
+    "model_deepseek_provider": {
         "name": "DeepSeek",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "api_key",
         "base_url": "https://api.deepseek.com/v1",
-        "credential_form": [_field("api_key", "API Key")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False, default="https://api.deepseek.com/v1"),
+            _field("api_key", "API Key"),
+        ],
     },
-    "qwen": {
+    "model_qwen_provider": {
         "name": "通义千问 (DashScope)",
         "model_types": [_LLM, _EMBEDDING, _TTS],
         "auth_type": "api_key",
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "credential_form": [_field("api_key", "API Key (DashScope)")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False,
+                   default="https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            _field("api_key", "API Key (DashScope)"),
+        ],
     },
-    "zhipu": {
+    "model_zhipu_provider": {
         "name": "智谱 GLM",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "api_key",
         "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "credential_form": [_field("api_key", "API Key")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False, default="https://open.bigmodel.cn/api/paas/v4"),
+            _field("api_key", "API Key"),
+        ],
     },
-    "kimi": {
+    "model_kimi_provider": {
         "name": "Kimi (Moonshot)",
         "model_types": [_LLM],
         "auth_type": "api_key",
         "base_url": "https://api.moonshot.cn/v1",
-        "credential_form": [_field("api_key", "API Key")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False, default="https://api.moonshot.cn/v1"),
+            _field("api_key", "API Key"),
+        ],
     },
-    "ollama": {
+    "model_ollama_provider": {
         "name": "Ollama",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "none",
         "base_url": "http://localhost:11434",
-        "credential_form": [_field("base_url", "Base URL", input_type="input", required=False)],
+        "credential_form": [_field("base_url", "Base URL", input_type="TextInput", required=False)],
     },
-    "xunfei": {
+    "model_xunfei_provider": {
         "name": "讯飞星火 (iFlytek)",
         "model_types": [_LLM, _TTS, _STT],
         "auth_type": "app_secret",
         "base_url": "",
         "credential_form": [
-            _field("app_id", "APP ID", input_type="input"),
-            _field("api_key", "API Key", input_type="input"),
+            _field("app_id", "APP ID", input_type="TextInput"),
+            _field("api_key", "API Key"),
             _field("api_secret", "API Secret"),
         ],
     },
-    "tencent": {
+    "model_tencent_provider": {
         "name": "腾讯混元",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "api_key",
         "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
-        "credential_form": [_field("api_key", "API Key")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False, default="https://api.hunyuan.cloud.tencent.com/v1"),
+            _field("api_key", "API Key"),
+        ],
     },
-    "volcanic": {
+    "model_volcanic_provider": {
         "name": "火山方舟 (Volcengine)",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "api_key",
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "credential_form": [_field("api_key", "API Key")],
+        "credential_form": [
+            _field("base_url", "API URL", input_type="TextInput", required=False, default="https://ark.cn-beijing.volces.com/api/v3"),
+            _field("api_key", "API Key"),
+        ],
     },
-    "local": {
+    "model_local_provider": {
         "name": "本地模型 (OpenAI 兼容)",
         "model_types": [_LLM, _EMBEDDING],
         "auth_type": "none",
         "base_url": "http://localhost:8081/v1",
         "credential_form": [
-            _field("base_url", "Base URL", input_type="input", required=True),
+            _field("base_url", "Base URL", input_type="TextInput", required=True),
+            _field("api_key", "API Key", required=False),
+        ],
+    },
+    "model_xinference_provider": {
+        "name": "Xinference",
+        "model_types": [_LLM, _EMBEDDING],
+        "auth_type": "none",
+        "base_url": "",
+        "credential_form": [_field("base_url", "Base URL", input_type="TextInput", required=True)],
+    },
+    "model_vllm_provider": {
+        "name": "vLLM",
+        "model_types": [_LLM, _EMBEDDING],
+        "auth_type": "none",
+        "base_url": "http://localhost:8000/v1",
+        "credential_form": [
+            _field("base_url", "Base URL", input_type="TextInput", required=True),
+            _field("api_key", "API Key", required=False),
+        ],
+    },
+    "model_docker_ai_provider": {
+        "name": "Docker AI",
+        "model_types": [_LLM, _EMBEDDING],
+        "auth_type": "none",
+        "base_url": "http://localhost:12434/v1",
+        "credential_form": [
+            _field("base_url", "Base URL", input_type="TextInput", required=True),
             _field("api_key", "API Key", required=False),
         ],
     },
@@ -144,6 +199,7 @@ def list_providers() -> list[dict[str, Any]]:
         {
             "provider": pid,
             "name": meta["name"],
+            "icon": get_icon(pid),
             "model_types": meta["model_types"],
             "auth_type": meta["auth_type"],
             "base_url": meta["base_url"],
@@ -160,6 +216,7 @@ def get_provider(provider: str) -> dict[str, Any] | None:
     return {
         "provider": provider,
         "name": meta["name"],
+        "icon": get_icon(provider),
         "model_types": meta["model_types"],
         "auth_type": meta["auth_type"],
         "base_url": meta["base_url"],

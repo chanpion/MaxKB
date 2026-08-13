@@ -72,7 +72,7 @@ def to_ts_vector(text: str, user_words: Sequence[str] | None = None) -> str:
     import jieba
 
     tokenizer = jieba if not user_words else _build_tokenizer(list(user_words))
-    result = tokenizer.lcut(text, cut_all=True)
+    result = list(tokenizer.cut(text, cut_all=True))
     return " ".join(result)
 
 

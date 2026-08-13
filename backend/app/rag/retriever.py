@@ -18,37 +18,37 @@ from app.core.db import engine as db_engine
 
 _SQL_EMBEDDING = """
 WITH vector_top AS (
-    SELECT e.id, e.paragraph_id, (e.embedding <=> $2::vector) AS distance
+    SELECT e.id, e.paragraph_id, (e.embedding <=> $1::vector) AS distance
     FROM embedding e
-    WHERE e.knowledge_id::text = ANY($6::text[]) AND e.is_active = TRUE
-    ORDER BY (e.embedding <=> $2::vector)
-    LIMIT LEAST($3 * 10, 500)
+    WHERE e.knowledge_id::text = ANY($5::text[]) AND e.is_active = TRUE
+    ORDER BY (e.embedding <=> $1::vector)
+    LIMIT LEAST($2 * 10, 500)
 )
 SELECT p.id AS paragraph_id, p.content, p.title, (1 - vc.distance) AS similarity
 FROM vector_top vc
 JOIN embedding e2 ON e2.id = vc.id
 JOIN paragraph p ON p.id = vc.paragraph_id
-WHERE (1 - vc.distance) > $4
+WHERE (1 - vc.distance) > $3
 ORDER BY similarity DESC
-LIMIT $5
+LIMIT $4
 """
 
 _SQL_BLEND = """
 WITH vector_top AS (
-    SELECT e.id, e.paragraph_id, (e.embedding <=> $2::vector) AS distance
+    SELECT e.id, e.paragraph_id, (e.embedding <=> $1::vector) AS distance
     FROM embedding e
-    WHERE e.knowledge_id::text = ANY($6::text[]) AND e.is_active = TRUE
-    ORDER BY (e.embedding <=> $2::vector)
-    LIMIT LEAST($3 * 10, 500)
+    WHERE e.knowledge_id::text = ANY($5::text[]) AND e.is_active = TRUE
+    ORDER BY (e.embedding <=> $1::vector)
+    LIMIT LEAST($2 * 10, 500)
 )
 SELECT p.id AS paragraph_id, p.content, p.title,
-       (1 - vc.distance + COALESCE(ts_rank_cd(e2.search_vector, websearch_to_tsquery('simple', $7), 32), 0)) AS similarity
+       (1 - vc.distance + COALESCE(ts_rank_cd(e2.search_vector, websearch_to_tsquery('simple', $6), 32), 0)) AS similarity
 FROM vector_top vc
 JOIN embedding e2 ON e2.id = vc.id
 JOIN paragraph p ON p.id = vc.paragraph_id
-WHERE (1 - vc.distance + COALESCE(ts_rank_cd(e2.search_vector, websearch_to_tsquery('simple', $7), 32), 0)) > $4
+WHERE (1 - vc.distance + COALESCE(ts_rank_cd(e2.search_vector, websearch_to_tsquery('simple', $6), 32), 0)) > $3
 ORDER BY similarity DESC
-LIMIT $5
+LIMIT $4
 """
 
 # Keyword search (mirrors Django ``KeywordsSearch``): pure tsvector match on the

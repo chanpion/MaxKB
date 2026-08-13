@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid as uuid_module
+from datetime import UTC, datetime
+
+logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.folder_tree import build_folder_tree, is_root_folder
 from app.core.db import get_session
 from app.core.security import get_current_user
 from app.core.tasks import enqueue_ingest
@@ -75,9 +84,13 @@ async def _build_knowledge_out(session: AsyncSession, k: Knowledge) -> Knowledge
     return data
 
 
-async def _list_knowledge_stmt(folder_id: str | None, name: str | None, desc: str | None):
+async def _list_knowledge_stmt(
+    folder_id: str | None, name: str | None, desc: str | None, workspace_id: str = "default"
+):
     stmt = select(Knowledge)
-    if folder_id:
+    # Selecting the synthetic root (根目录) returns all resources in the
+    # workspace — mirrors the legacy ``folder_id == workspace_id`` behaviour.
+    if folder_id and not is_root_folder(folder_id, workspace_id):
         stmt = stmt.where(Knowledge.folder_id == folder_id)
     if name:
         stmt = stmt.where(Knowledge.name.ilike(f"%{name}%"))
@@ -91,10 +104,11 @@ async def list_knowledge(
     folder_id: str | None = None,
     name: str | None = None,
     desc: str | None = None,
+    workspace_id: str = "default",
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> list[KnowledgeOut]:
-    stmt = await _list_knowledge_stmt(folder_id, name, desc)
+    stmt = await _list_knowledge_stmt(folder_id, name, desc, workspace_id)
     result = await session.execute(stmt)
     rows = result.scalars().all()
     return [await _build_knowledge_out(session, k) for k in rows]
@@ -107,10 +121,11 @@ async def list_knowledge_page(
     folder_id: str | None = None,
     name: str | None = None,
     desc: str | None = None,
+    workspace_id: str = "default",
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> KnowledgePage:
-    stmt = await _list_knowledge_stmt(folder_id, name, desc)
+    stmt = await _list_knowledge_stmt(folder_id, name, desc, workspace_id)
     total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
     result = await session.execute(stmt.offset(max(current_page - 1, 0) * page_size).limit(page_size))
     rows = result.scalars().all()
@@ -160,32 +175,19 @@ async def list_knowledge_folders(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> list[dict]:
+    """Folder tree for the knowledge page sidebar.
+
+    Returns a single tree rooted at a synthetic ``根目录`` node (id == workspace
+    id) with the real folders nested underneath, matching the Django backend so
+    the frontend's folder tree renders a top-level root directory.
+    """
     result = await session.execute(
         select(KnowledgeFolder)
         .where(KnowledgeFolder.workspace_id == workspace_id)
         .order_by(KnowledgeFolder.create_time)
     )
-    rows = result.scalars().all()
-
-    # The Next.js tree view needs a *nested* structure (each node carrying a
-    # ``children`` array); a flat list would render every folder at the top
-    # level. Build the tree purely from ``parent_id`` so we don't depend on the
-    # legacy MPTT (lft/rght) columns, which are not maintained on insert.
-    folders = [
-        {"id": f.id, "name": f.name, "desc": f.desc, "parent_id": f.parent_id}
-        for f in rows
-    ]
-    ids = {f["id"] for f in folders}
-    children_map: dict[str | None, list[dict]] = {}
-    for f in folders:
-        children_map.setdefault(f["parent_id"], []).append(f)
-    for f in folders:
-        f["children"] = children_map.get(f["id"], [])
-
-    # Roots: parent_id is NULL or points to a folder that does not exist
-    # (e.g. the 'default' workspace marker when the default folder is absent).
-    roots = [f for f in folders if f["parent_id"] is None or f["parent_id"] not in ids]
-    return roots
+    folders = result.scalars().all()
+    return build_folder_tree(folders, workspace_id)
 
 
 @router.post("/folder", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -270,16 +272,43 @@ async def upload_knowledge_file(
             "credential": resolve_credential(embedding_model_row.credential),
             "dimensions": (embedding_model_row.meta or {}).get("dimensions"),
         }
-        await enqueue_ingest(
-            knowledge_id=str(knowledge.id),
-            document_id=str(document.id),
-            user_id=str(current_user.id) if current_user.id is not None else None,
-            filename=file.filename or "document",
-            content=content_bytes,
-            embedding=embedding,
-            with_filter=False,
-            limit=4096,
-        )
+        try:
+            await enqueue_ingest(
+                knowledge_id=str(knowledge.id),
+                document_id=str(document.id),
+                user_id=str(current_user.id) if current_user.id is not None else None,
+                filename=file.filename or "document",
+                content=content_bytes,
+                embedding=embedding,
+                with_filter=False,
+                limit=4096,
+            )
+        except Exception as e:
+            logger.warning("queue ingest failed, embedding inline: %s", e)
+            try:
+                from app.rag.pipeline import ingest_document
+
+                await ingest_document(
+                    session,
+                    knowledge_id=str(knowledge.id),
+                    document_id=str(document.id),
+                    user_id=str(current_user.id) if current_user.id is not None else None,
+                    filename=file.filename or "document",
+                    content=content_bytes,
+                    embedding=embedding,
+                    with_filter=False,
+                    limit=4096,
+                )
+                document.status = "SUCCESS"
+                document.status_meta = json.dumps(
+                    {"state_time": {str(i): _now_iso() for i in range(3)}}
+                )
+                await session.commit()
+            except Exception as ie:
+                logger.exception("inline ingest failed: %s", ie)
+                document.status = "ERROR"
+                document.status_meta = json.dumps({"error": str(ie)})
+                await session.commit()
 
     return {
         "result": True,
@@ -1652,16 +1681,41 @@ async def upload_document_file(
     await session.commit()
 
     content = await file.read()
-    await enqueue_ingest(
-        knowledge_id=str(knowledge_id),
-        document_id=str(document_id),
-        user_id=str(current_user.id) if current_user.id is not None else None,
-        filename=file.filename or "document",
-        content=content,
-        embedding=embedding,
-        with_filter=with_filter,
-        limit=limit,
-    )
+    try:
+        await enqueue_ingest(
+            knowledge_id=str(knowledge_id),
+            document_id=str(document_id),
+            user_id=str(current_user.id) if current_user.id is not None else None,
+            filename=file.filename or "document",
+            content=content,
+            embedding=embedding,
+            with_filter=with_filter,
+            limit=limit,
+        )
+    except Exception as e:
+        logger.warning("queue ingest failed, embedding inline: %s", e)
+        try:
+            from app.rag.pipeline import ingest_document
+
+            await ingest_document(
+                session,
+                knowledge_id=str(knowledge_id),
+                document_id=str(document_id),
+                user_id=str(current_user.id) if current_user.id is not None else None,
+                filename=file.filename or "document",
+                content=content,
+                embedding=embedding,
+                with_filter=with_filter,
+                limit=limit,
+            )
+            document.status = "SUCCESS"
+            document.status_meta = json.dumps({"state_time": {str(i): _now_iso() for i in range(3)}})
+            await session.commit()
+        except Exception as ie:
+            logger.exception("inline ingest failed: %s", ie)
+            document.status = "ERROR"
+            document.status_meta = json.dumps({"error": str(ie)})
+            await session.commit()
 
     return {"result": True, "document_id": str(document_id), "status": "PENDING"}
 
@@ -1898,7 +1952,6 @@ async def split_document(
     the legacy backend).
     """
     import json
-
     from uuid import uuid4
 
     from app.rag.splitter import SplitModel, get_split_model

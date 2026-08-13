@@ -41,6 +41,31 @@ redis_settings = RedisSettings(
 )
 
 
+class NoWorkerError(RuntimeError):
+    """Raised by ``enqueue_*`` helpers when no arq worker is reachable.
+
+    The web process treats this as a signal to embed inline (single-process dev
+    setup) instead of silently leaving the job queued forever with no worker.
+    """
+
+
+async def _worker_available() -> bool:
+    """Best-effort check for at least one live arq worker.
+
+    Returns ``False`` if Redis is unreachable or no worker has registered, so
+    callers fall back to synchronous in-process embedding.
+    """
+    try:
+        pool = aioredis.ConnectionPool.from_url(settings.redis_url)
+        redis = ArqRedis(pool_or_conn=pool)
+        try:
+            return bool(await redis.workers())
+        finally:
+            await redis.aclose()
+    except Exception:
+        return False
+
+
 # --------------------------------------------------------------------------- #
 # Task functions (resolved by arq via their qualified name).
 # --------------------------------------------------------------------------- #
@@ -262,6 +287,8 @@ async def enqueue_ingest(
     Connects to the same Redis arq uses as its broker and enqueues
     :func:`ingest_document_task` (fully-qualified name so the worker resolves it).
     """
+    if not await _worker_available():
+        raise NoWorkerError("no arq worker is running; embed inline")
     pool = aioredis.ConnectionPool.from_url(settings.redis_url)
     redis = ArqRedis(pool_or_conn=pool)
     try:
@@ -292,6 +319,8 @@ async def enqueue_ingest_paragraphs(
     Mirrors :func:`enqueue_ingest` but targets ``ingest_paragraphs_task`` (no
     raw file content — the ``Paragraph`` rows already exist in the DB).
     """
+    if not await _worker_available():
+        raise NoWorkerError("no arq worker is running; embed inline")
     pool = aioredis.ConnectionPool.from_url(settings.redis_url)
     redis = ArqRedis(pool_or_conn=pool)
     try:

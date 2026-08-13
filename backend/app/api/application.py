@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import secrets
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid_utils.compat as uuid
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.folder_tree import build_folder_tree
 from app.core.db import get_session
 from app.core.security import get_current_user
 from app.models.application import (
@@ -75,11 +78,15 @@ async def list_application_folders(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> list[dict]:
+    """Folder tree for the application page sidebar.
+
+    Returns a single tree rooted at a synthetic ``根目录`` node (id == workspace
+    id) with the real folders nested underneath, matching the Django backend.
+    """
     result = await session.execute(
         select(ApplicationFolder).where(ApplicationFolder.workspace_id == workspace_id).order_by(ApplicationFolder.lft)
     )
-    rows = result.scalars().all()
-    return [{"id": f.id, "name": f.name, "desc": f.desc, "parent_id": f.parent_id} for f in rows]
+    return build_folder_tree(result.scalars().all(), workspace_id)
 
 
 @router.post("/folder", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -388,7 +395,15 @@ async def get_access_token(
     )
     token = result.scalar_one_or_none()
     if token is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access token not found")
+        # 对齐旧版 Django：发布应用时若不存在则自动创建访问令牌
+        token = ApplicationAccessToken(
+            application_id=application_id,
+            access_token=hashlib.md5(str(uuid.uuid7()).encode()).hexdigest()[8:24],
+            is_active=True,
+        )
+        session.add(token)
+        await session.commit()
+        await session.refresh(token)
     return AccessTokenOut.model_validate(token)
 
 
@@ -412,6 +427,150 @@ async def update_access_token(
     await session.commit()
     await session.refresh(token)
     return AccessTokenOut.model_validate(token)
+
+
+# ---------------------------------------------------------------------------
+# Statistics — 对齐旧版 application_stats / application_token_usage / top_questions
+# ---------------------------------------------------------------------------
+
+
+def _resolve_time_range(start_time: str | None, end_time: str | None) -> tuple[datetime, datetime]:
+    """将 %Y-%m-%d 字符串转换为当日 00:00:00 ~ 23:59:59.999999 的 datetime。"""
+    if start_time:
+        start = datetime.combine(datetime.strptime(start_time, "%Y-%m-%d").date(), time.min)
+    else:
+        start = datetime(2000, 1, 1, 0, 0, 0)
+    if end_time:
+        end = datetime.combine(datetime.strptime(end_time, "%Y-%m-%d").date(), time.max)
+    else:
+        end = datetime(2999, 12, 31, 23, 59, 59, 999999)
+    return start, end
+
+
+@router.get("/{application_id}/application_stats")
+async def application_stats_trend(
+    application_id: str,
+    start_time: str | None = Query(None),
+    end_time: str | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    """按天聚合对话统计，对齐旧版 chat_record_count_trend.sql + customer_count_trend.sql。"""
+    start, end = _resolve_time_range(start_time, end_time)
+    chat_sql = text(
+        """
+        SELECT
+            SUM(CASE WHEN r.vote_status = '0' THEN 1 ELSE 0 END) AS star_num,
+            SUM(CASE WHEN r.vote_status = '1' THEN 1 ELSE 0 END) AS trample_num,
+            SUM(r.message_tokens + r.answer_tokens) AS tokens_num,
+            COUNT(r.id) AS chat_record_count,
+            COUNT(DISTINCT c.chat_user_id) AS customer_num,
+            r.create_time::DATE AS day
+        FROM application_chat_record r
+        LEFT JOIN application_chat c ON c.id = r.chat_id
+        WHERE c.application_id = :app_id
+          AND r.create_time >= :start
+          AND r.create_time <= :end
+        GROUP BY r.create_time::DATE
+        """
+    )
+    customer_sql = text(
+        """
+        SELECT
+            COUNT(s.id) AS customer_added_count,
+            s.create_time::DATE AS day
+        FROM application_chat_user_stats s
+        WHERE s.application_id = :app_id
+          AND s.create_time >= :start
+          AND s.create_time <= :end
+        GROUP BY s.create_time::DATE
+        """
+    )
+    params = {"app_id": application_id, "start": start, "end": end}
+    chat_rows = (await session.execute(chat_sql, params)).mappings().all()
+    customer_rows = (await session.execute(customer_sql, params)).mappings().all()
+    customer_by_day = {row["day"].strftime("%Y-%m-%d") if row["day"] else "": row for row in customer_rows}
+
+    days = {row["day"].strftime("%Y-%m-%d") if row["day"] else "" for row in chat_rows}
+    days |= set(customer_by_day.keys())
+    # 补全起止区间每一天（对齐旧版 get_days_between_dates 合并逻辑）
+    cur = start.date()
+    while cur <= end.date():
+        days.add(cur.strftime("%Y-%m-%d"))
+        cur += timedelta(days=1)
+
+    result = []
+    for day in sorted(days):
+        chat = next((r for r in chat_rows if (r["day"].strftime("%Y-%m-%d") if r["day"] else "") == day), None)
+        cust = customer_by_day.get(day, {})
+        result.append(
+            {
+                "day": day,
+                "star_num": int(chat["star_num"] or 0) if chat else 0,
+                "trample_num": int(chat["trample_num"] or 0) if chat else 0,
+                "tokens_num": int(chat["tokens_num"] or 0) if chat else 0,
+                "chat_record_count": int(chat["chat_record_count"] or 0) if chat else 0,
+                "customer_num": int(chat["customer_num"] or 0) if chat else 0,
+                "customer_added_count": int(cust.get("customer_added_count") or 0),
+            }
+        )
+    return result
+
+
+@router.get("/{application_id}/application_token_usage")
+async def application_token_usage(
+    application_id: str,
+    start_time: str | None = Query(None),
+    end_time: str | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    """按用户聚合 Token 消耗排行，对齐旧版 get_token_usage.sql。"""
+    start, end = _resolve_time_range(start_time, end_time)
+    sql = text(
+        """
+        SELECT
+            SUM(r.message_tokens + r.answer_tokens) AS token_usage,
+            MAX(COALESCE(c.asker->>'username', '游客')) AS username
+        FROM application_chat_record r
+        LEFT JOIN application_chat c ON c.id = r.chat_id
+        WHERE c.application_id = :app_id
+          AND r.create_time >= :start
+          AND r.create_time <= :end
+        GROUP BY c.chat_user_id
+        ORDER BY token_usage DESC
+        """
+    )
+    rows = (await session.execute(sql, {"app_id": application_id, "start": start, "end": end})).mappings().all()
+    return [{"token_usage": int(r["token_usage"] or 0), "username": r["username"]} for r in rows]
+
+
+@router.get("/{application_id}/top_questions")
+async def application_top_questions(
+    application_id: str,
+    start_time: str | None = Query(None),
+    end_time: str | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(get_current_user),
+) -> list[dict]:
+    """按用户聚合提问次数排行，对齐旧版 top_questions.sql。"""
+    start, end = _resolve_time_range(start_time, end_time)
+    sql = text(
+        """
+        SELECT
+            COUNT(r.id) AS chat_record_count,
+            MAX(COALESCE(c.asker->>'username', '游客')) AS username
+        FROM application_chat_record r
+        LEFT JOIN application_chat c ON c.id = r.chat_id
+        WHERE c.application_id = :app_id
+          AND r.create_time >= :start
+          AND r.create_time <= :end
+        GROUP BY c.chat_user_id
+        ORDER BY chat_record_count DESC, username ASC
+        """
+    )
+    rows = (await session.execute(sql, {"app_id": application_id, "start": start, "end": end})).mappings().all()
+    return [{"chat_record_count": int(r["chat_record_count"] or 0), "username": r["username"]} for r in rows]
 
 
 # ---------------------------------------------------------------------------

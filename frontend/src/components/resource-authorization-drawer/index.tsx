@@ -36,6 +36,7 @@ const ResourceAuthorizationDrawer = forwardRef<ResourceAuthorizationDrawerRef, {
     }
     useEffect(() => {
       if (open && resourceId) load()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, resourceId])
 
     const grant = () => {

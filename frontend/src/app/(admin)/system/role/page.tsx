@@ -1,12 +1,9 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Table, Button, Space, Typography, Card, Tag, message, Tabs, Spin} from 'antd'
-import {HomeOutlined, TeamOutlined, SettingOutlined, UserOutlined, AppstoreOutlined, ToolOutlined, DatabaseOutlined} from '@ant-design/icons'
-import {useTranslations} from 'next-intl'
+import {Table, Typography, Card, Tag, Spin} from 'antd'
 import {systemApi} from '@/lib/api/system'
 
 export default function RolePage() {
-  const t = useTranslations('menu')
   const [internalRoles, setInternalRoles] = useState<any[]>([])
   const [customRoles, setCustomRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,11 +28,7 @@ export default function RolePage() {
 
   return (
     <div>
-      <Breadcrumb style={{marginBottom: 16}} items={[
-        {title: <><HomeOutlined /> {t('home')}</>},
-        {title: <><TeamOutlined /> 角色管理</>},
-      ]} />
-      <Typography.Title level={4} style={{marginBottom: 16}}>角色管理</Typography.Title>
+      <Typography.Title level={4} style={{marginTop: 0, marginBottom: 16}}>角色管理</Typography.Title>
       {loading ? <div style={{textAlign: 'center', padding: 60}}><Spin size="large" /></div> : (
         <>
           <Card style={{borderRadius: 8, marginBottom: 16}} title="内置角色">

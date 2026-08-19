@@ -1,17 +1,32 @@
 'use client'
 import {useEffect, useState} from 'react'
 import {Spin} from 'antd'
-import {useRouter} from '@/i18n/navigation'
+import {useRouter, usePathname} from '@/i18n/navigation'
 import {useLoginStore, useThemeStore} from '@/store'
 import Logo from '@/components/layout/Logo'
 import TopMenu from '@/components/layout/TopMenu'
 import UserAvatar from '@/components/layout/UserAvatar'
+import Sidebar from '@/components/layout/Sidebar'
+import AppBreadcrumb from '@/components/layout/AppBreadcrumb'
+import {appDetailMenu, knowledgeDetailMenu, systemMenu} from '@/config/menu'
 import {LOGIN_PATH} from '@/lib/constants'
 
 const HEADER_HEIGHT = 56
 
+// 布局模式：main（无 Sidebar，工作区主页）/ detail（详情页 + Sidebar + 面包屑）/ system（系统管理 + Sidebar）
+type LayoutMode = 'main' | 'detail' | 'system'
+
+function resolveLayout(pathname: string): LayoutMode {
+  const seg = pathname.split('/').filter(Boolean)
+  if (seg[0] === 'system') return 'system'
+  if (seg[0] === 'application' && seg[1]) return 'detail'
+  if (seg[0] === 'knowledge' && seg[1]) return 'detail'
+  return 'main'
+}
+
 export default function AdminLayout({children}: {children: React.ReactNode}) {
   const router = useRouter()
+  const pathname = usePathname()
   const getToken = useLoginStore((s) => s.getToken)
   const clearToken = useLoginStore((s) => s.clearToken)
   const isDark = useThemeStore((s) => s.isDark)
@@ -37,10 +52,41 @@ export default function AdminLayout({children}: {children: React.ReactNode}) {
     )
   }
 
+  const mode = resolveLayout(pathname)
+  const seg = pathname.split('/').filter(Boolean)
+
+  // 计算 Sidebar 选中项
+  let sidebarItems = null
+  let selectedKey = ''
+  let breadcrumb: React.ReactNode = null
+  if (mode === 'system') {
+    sidebarItems = systemMenu
+    selectedKey = pathname
+  } else if (mode === 'detail') {
+    if (seg[0] === 'application') {
+      sidebarItems = appDetailMenu
+      selectedKey = seg[2] || 'overview'
+      breadcrumb = <AppBreadcrumb type="application" id={seg[1]} backTo="/application" />
+    } else {
+      sidebarItems = knowledgeDetailMenu
+      selectedKey = seg[2] || 'document'
+      breadcrumb = <AppBreadcrumb type="knowledge" id={seg[1]} backTo="/knowledge" />
+    }
+  }
+
   const headerBg = isDark
     ? 'linear-gradient(90deg, #1f1f1f 0%, #2a2a2a 100%)'
     : 'linear-gradient(90deg, #ebf1ff 24.34%, #e5fbf8 56.18%, #f2ebfe 90.18%)'
   const headerBorder = isDark ? '#333' : '#e5e6e8'
+
+  const handleMenuSelect = (key: string) => {
+    if (mode === 'system') {
+      router.push(key)
+    } else if (mode === 'detail') {
+      const base = `/${seg[0]}/${seg[1]}`
+      router.push(`${base}/${key}`)
+    }
+  }
 
   return (
     <div style={{minHeight: '100vh', background: isDark ? '#141414' : '#f5f6f7'}}>
@@ -74,11 +120,28 @@ export default function AdminLayout({children}: {children: React.ReactNode}) {
         </div>
       </div>
 
-      {/* Body: full-width content */}
+      {/* Body */}
       <div style={{paddingTop: HEADER_HEIGHT, minHeight: '100vh'}}>
-        <div style={{padding: 24, maxWidth: 1400, margin: '0 auto'}}>
-          {children}
-        </div>
+        {mode === 'main' ? (
+          <div style={{padding: 24}}>{children}</div>
+        ) : (
+          <div style={{display: 'flex', alignItems: 'stretch', height: 'calc(100vh - 56px)'}}>
+            {sidebarItems && (
+              <Sidebar
+                items={sidebarItems}
+                selectedKey={selectedKey}
+                onSelect={handleMenuSelect}
+                expandChildren={mode === 'system'}
+              />
+            )}
+            <div style={{flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column'}}>
+              {mode === 'detail' && breadcrumb}
+              <div style={{flex: 1, overflow: 'auto', padding: 24, boxSizing: 'border-box'}}>
+                {children}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

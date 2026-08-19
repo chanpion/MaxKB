@@ -1,9 +1,8 @@
 'use client'
 import React, {useEffect, useState, useRef} from 'react'
-import {Breadcrumb, Card, Button, Typography, List, Spin, Input, Modal, Form, message, Space, Tag, Empty, Popconfirm} from 'antd'
-import {HomeOutlined, FileTextOutlined, ArrowLeftOutlined, PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined} from '@ant-design/icons'
+import {Card, Button, Typography, List, Spin, Input, Modal, Form, message, Space, Tag, Empty, Popconfirm} from 'antd'
+import {PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
-import {useRouter} from '@/i18n/navigation'
 import {paragraphApi} from '@/lib/api/knowledge/paragraph'
 import {get} from '@/lib/request'
 import {useUserStore} from '@/store'
@@ -12,7 +11,6 @@ import {dateFormat} from '@/utils/time'
 function ws() { return useUserStore.getState().getWorkspaceId() }
 
 export default function ParagraphPage() {
-  const router = useRouter()
   const params = useParams()
   const kid = params.id as string
   const docId = params.docId as string
@@ -31,6 +29,7 @@ export default function ParagraphPage() {
       setDoc(res.data)
     }).catch(() => {})
     loadParagraphs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kid, docId])
 
   const loadParagraphs = () => {
@@ -69,27 +68,19 @@ export default function ParagraphPage() {
   }
 
   return (
-    <div>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: 16, gap: 12}}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`/knowledge/${kid}/document`)}>返回</Button>
-        <Breadcrumb items={[
-          {title: <><HomeOutlined /> 首页</>},
-          {title: <><FileTextOutlined /> {doc?.name || '文档段落'}</>},
-        ]} />
-      </div>
-      <Card style={{borderRadius: 8, marginBottom: 16}}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-          <div>
-            <Typography.Title level={5} style={{margin: 0}}>{doc?.name || '文档段落'}</Typography.Title>
-            <Typography.Text type="secondary">{list.length} 个段落</Typography.Text>
-          </div>
-          <Space>
-            <Input.Search value={search} onChange={(e) => setSearch(e.target.value)} onSearch={loadParagraphs}
-              placeholder="搜索段落" style={{width: 240}} allowClear />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>添加段落</Button>
-          </Space>
+    <Card style={{borderRadius: 8, marginBottom: 16}}>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
+        <div>
+          <Typography.Title level={5} style={{margin: 0}}>{doc?.name || '文档段落'}</Typography.Title>
+          <Typography.Text type="secondary">{list.length} 个段落</Typography.Text>
         </div>
-      </Card>
+        <Space>
+          <Input.Search value={search} onChange={(e) => setSearch(e.target.value)} onSearch={loadParagraphs}
+            placeholder="搜索段落" style={{width: 240}} allowClear />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>添加段落</Button>
+        </Space>
+      </div>
+      <div>
       {loading ? <div style={{textAlign: 'center', padding: 60}}><Spin size="large" /></div>
       : list.length === 0 ? <Empty description="暂无段落" />
       : <List dataSource={list} renderItem={(item: any, i: number) => (
@@ -129,6 +120,7 @@ export default function ParagraphPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+      </div>
+    </Card>
   )
 }

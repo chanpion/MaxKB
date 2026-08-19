@@ -29,6 +29,7 @@ export default function ApplicationPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadList() }, [folder.currentFolder?.id])
 
   const handleCreate = () => {
@@ -70,14 +71,31 @@ export default function ApplicationPage() {
               <Col key={item.id} xs={24} sm={12} md={12} lg={8} xl={6}>
                 <Card hoverable style={{borderRadius: 8}}
                   onClick={() => router.push(`/application/${item.id}/overview`)}
-                  title={<div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <AppstoreOutlined style={{fontSize: 18, color: '#1677FF'}} />
-                    <Typography.Text ellipsis>{item.name}</Typography.Text>
-                  </div>}
-                  extra={<Tag>{item.model_name || '未配置'}</Tag>}>
-                  <Typography.Paragraph ellipsis={{rows: 2}} type="secondary" style={{marginBottom: 0, minHeight: 40}}>
+                  styles={{body: {padding: 20, minHeight: 166}}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12}}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+                      background: 'linear-gradient(135deg, rgba(51,112,255,0.14), rgba(19,194,194,0.12))',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <AppstoreOutlined style={{fontSize: 17, color: '#3370FF'}} />
+                    </div>
+                    <div style={{flex: 1, minWidth: 0}}>
+                      <Typography.Text ellipsis strong style={{fontSize: 15}}>{item.name}</Typography.Text>
+                      <div style={{marginTop: 2}}>
+                        <Tag color={item.model_name ? 'blue' : 'default'} style={{marginRight: 0}}>
+                          {item.model_name || '未配置'}
+                        </Tag>
+                      </div>
+                    </div>
+                  </div>
+                  <Typography.Paragraph ellipsis={{rows: 2}} type="secondary"
+                    style={{marginBottom: 8, fontSize: 13, minHeight: 40, lineHeight: '20px'}}>
                     {item.desc || '暂无描述'}
                   </Typography.Paragraph>
+                  <Typography.Text type="secondary" style={{fontSize: 12}}>
+                    创建人：{item.user_name || '—'}
+                  </Typography.Text>
                 </Card>
               </Col>
             ))}

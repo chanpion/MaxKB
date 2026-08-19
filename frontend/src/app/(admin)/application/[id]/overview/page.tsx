@@ -1,14 +1,11 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Descriptions, Button, Card, Statistic, Row, Col, Tag, Spin, Typography, message, Space, Tabs} from 'antd'
-import {HomeOutlined, AppstoreOutlined, ArrowLeftOutlined, CopyOutlined, CheckCircleOutlined, SettingOutlined, KeyOutlined, MessageOutlined} from '@ant-design/icons'
+import {Button, Card, Statistic, Row, Col, Tag, Spin, Typography, Space} from 'antd'
 import {useParams} from 'next/navigation'
-import {useRouter, usePathname} from '@/i18n/navigation'
-import {useTranslations} from 'next-intl'
+import {useRouter} from '@/i18n/navigation'
 import {applicationApi} from '@/lib/api/application'
 
 export default function AppOverviewPage() {
-  const t = useTranslations('menu')
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -23,28 +20,8 @@ export default function AppOverviewPage() {
   if (loading) return <div style={{textAlign: 'center', padding: 80}}><Spin size="large" /></div>
   if (!app) return <Typography.Text type="secondary">智能体不存在</Typography.Text>
 
-  const tabItems = [
-    {key: 'overview', label: '概览'},
-    {key: 'setting', label: '设置'},
-    {key: 'access', label: '访问'},
-    {key: 'chat', label: '体验'},
-    {key: 'chat-log', label: '聊天日志'},
-  ]
-
   return (
     <div>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: 12, gap: 12}}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push('/application')}>返回</Button>
-        <Breadcrumb items={[
-          {title: <><HomeOutlined /> {t('home')}</>},
-          {title: <><AppstoreOutlined /> {t('application')}</>},
-          {title: app.name},
-        ]} />
-      </div>
-      <Tabs activeKey="overview" items={tabItems}
-        onChange={(key) => router.push(`/application/${id}/${key}`)}
-        style={{marginBottom: 8}} />
-
       <Card style={{borderRadius: 8, marginBottom: 16}}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
           <div>

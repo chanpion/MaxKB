@@ -1,10 +1,7 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Table, Button, Typography, Tag, Space, Tabs, Spin} from 'antd'
-import {HomeOutlined, AppstoreOutlined, ArrowLeftOutlined, MessageOutlined, SettingOutlined, KeyOutlined} from '@ant-design/icons'
+import {Card, Table, Typography} from 'antd'
 import {useParams} from 'next/navigation'
-import {useRouter, usePathname} from '@/i18n/navigation'
-import {useTranslations} from 'next-intl'
 import {get} from '@/lib/request'
 import {useUserStore} from '@/store'
 import {dateFormat} from '@/utils/time'
@@ -12,8 +9,6 @@ import {dateFormat} from '@/utils/time'
 function ws() { return useUserStore.getState().getWorkspaceId() }
 
 export default function ChatLogPage() {
-  const t = useTranslations('menu')
-  const router = useRouter()
   const params = useParams()
   const id = params.id as string
   const [logs, setLogs] = useState<any[]>([])
@@ -25,14 +20,6 @@ export default function ChatLogPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [id])
 
-  const tabItems = [
-    {key: 'overview', label: '概览'},
-    {key: 'setting', label: '设置'},
-    {key: 'access', label: '访问'},
-    {key: 'chat', label: '体验'},
-    {key: 'chat-log', label: '聊天日志'},
-  ]
-
   const columns = [
     {title: '用户', dataIndex: 'abstract', key: 'abstract', ellipsis: true},
     {title: '消息数', dataIndex: 'chat_record_count', key: 'chat_record_count', width: 80},
@@ -41,20 +28,10 @@ export default function ChatLogPage() {
   ]
 
   return (
-    <div>
-      <div style={{display: 'flex', alignItems: 'center', marginBottom: 12, gap: 12}}>
-        <Button icon={<ArrowLeftOutlined />} onClick={() => router.push(`/application/${id}/overview`)}>返回</Button>
-        <Breadcrumb items={[
-          {title: <><HomeOutlined /> {t('home')}</>},
-          {title: <><AppstoreOutlined /> {t('application')}</>},
-          {title: '聊天日志'},
-        ]} />
-      </div>
-      <Tabs activeKey="chat-log" items={tabItems}
-        onChange={(key) => router.push(`/application/${id}/${key}`)}
-        style={{marginBottom: 8}} />
+    <Card style={{borderRadius: 8}}>
+      <Typography.Title level={4} style={{marginTop: 0}}>聊天日志</Typography.Title>
       <Table dataSource={logs} columns={columns} rowKey="id" loading={loading}
         pagination={{pageSize: 20}} size="middle" />
-    </div>
+    </Card>
   )
 }

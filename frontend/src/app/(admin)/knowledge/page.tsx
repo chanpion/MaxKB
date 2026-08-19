@@ -24,9 +24,9 @@ export default function KnowledgePage() {
     <div style={{display: 'flex', gap: 16, height: 'calc(100vh - 56px - 48px)'}}>
       <div
         style={{
-          width: 280,
+          width: 240,
           background: panelBg,
-          borderRadius: 12,
+          borderRadius: 8,
           border: `1px solid ${panelBorder}`,
           flexShrink: 0,
           display: 'flex',
@@ -37,7 +37,7 @@ export default function KnowledgePage() {
         <div
           style={{
             padding: '16px 16px 14px',
-            background: 'linear-gradient(135deg, rgba(22,119,255,0.10), rgba(19,194,194,0.06))',
+            background: 'linear-gradient(135deg, rgba(51,112,255,0.10), rgba(19,194,194,0.06))',
             borderBottom: `1px solid ${panelBorder}`,
             display: 'flex',
             alignItems: 'center',
@@ -49,7 +49,7 @@ export default function KnowledgePage() {
               width: 30,
               height: 30,
               borderRadius: 8,
-              background: 'linear-gradient(135deg, #1677ff, #13c2c2)',
+              background: 'linear-gradient(135deg, #3370ff, #13c2c2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -66,7 +66,7 @@ export default function KnowledgePage() {
       </div>
       <div
         style={{
-          flex: 1, overflow: 'hidden', background: panelBg, borderRadius: 12, padding: 16,
+          flex: 1, overflow: 'hidden', background: panelBg, borderRadius: 8, padding: 16,
           border: `1px solid ${panelBorder}`,
           display: 'flex', flexDirection: 'column',
         }}

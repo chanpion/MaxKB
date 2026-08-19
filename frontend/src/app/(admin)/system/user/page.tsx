@@ -1,12 +1,10 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Table, Button, Space, Typography, Modal, Form, Input, message, Tag, Popconfirm} from 'antd'
-import {HomeOutlined, UserOutlined, PlusOutlined, EditOutlined, DeleteOutlined} from '@ant-design/icons'
-import {useTranslations} from 'next-intl'
+import {Card, Table, Button, Space, Typography, Modal, Form, Input, message, Tag, Popconfirm} from 'antd'
+import {PlusOutlined, EditOutlined, DeleteOutlined} from '@ant-design/icons'
 import {systemApi} from '@/lib/api/system'
 
 export default function UserManagePage() {
-  const t = useTranslations('menu')
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -68,7 +66,7 @@ export default function UserManagePage() {
   ]
 
   return (
-    <div>
+    <Card style={{borderRadius: 8}}>
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
         <Typography.Title level={4} style={{margin: 0}}>用户管理</Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建用户</Button>
@@ -101,6 +99,6 @@ export default function UserManagePage() {
           <Form.Item name="email" label="邮箱"><Input /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </Card>
   )
 }

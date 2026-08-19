@@ -1,7 +1,7 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Table, Button, Space, Typography, Tag, Spin, Modal, Form, Input, message, Popconfirm} from 'antd'
-import {HomeOutlined, FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined} from '@ant-design/icons'
+import {Table, Button, Space, Typography, Tag, Spin, Modal, Form, Input, message, Popconfirm, Card} from 'antd'
+import {PlusOutlined, EditOutlined, DeleteOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
 import {get, post, del} from '@/lib/request'
 import {useUserStore} from '@/store'
@@ -21,6 +21,7 @@ export default function ProblemPage() {
     setLoading(true)
     get(`${prefix}`).then((res: any) => setList(res.data || [])).catch(() => {}).finally(() => setLoading(false))
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [kid])
 
   const handleCreate = () => {
@@ -34,11 +35,7 @@ export default function ProblemPage() {
   }
 
   return (
-    <div>
-      <Breadcrumb style={{marginBottom: 12}} items={[
-        {title: <><HomeOutlined /> 首页</>},
-        {title: <><FileTextOutlined /> 知识库详情</>},
-      ]} />
+    <Card style={{borderRadius: 8}}>
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
         <Typography.Title level={5} style={{margin: 0}}>问题管理</Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建问题</Button>
@@ -59,6 +56,6 @@ export default function ProblemPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </Card>
   )
 }

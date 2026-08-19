@@ -17,7 +17,6 @@ import {MsgConfirm} from '@/utils/message'
 import {useTranslations} from 'next-intl'
 
 const iconMap: Record<string, React.ReactNode> = {
-  all: <AppIcon iconName="app-all-menu-active" />,
   share: <AppIcon iconName="app-shared-active" />,
 }
 
@@ -28,6 +27,23 @@ const SORT_COMPARATORS: Record<string, (a: any, b: any) => number> = {
   [SORT_TYPES.NAME_DESC]: (a, b) => (b.title || '').localeCompare(a.title || ''),
   [SORT_TYPES.CUSTOM]: (a, b) => (a.order || 0) - (b.order || 0),
 }
+
+// 后端 getFolder 返回树结构 [workspace根节点]，真实文件夹在 rootNode.children 中。
+// 剥离 workspace 根节点，只保留真实文件夹组成的树。
+const buildFolderTree = (list: any[]): any[] =>
+  (list || [])
+    .filter((f: any) => f.id)
+    .map((f: any) => {
+      const hasChildren = Array.isArray(f.children) && f.children.length > 0
+      return {
+        ...f,
+        key: f.id,
+        title: f.name,
+        icon: <FolderOutlined />,
+        children: hasChildren ? buildFolderTree(f.children) : undefined,
+        isLeaf: !hasChildren,
+      }
+    })
 
 export default function FolderVirtualizedTree({
   source,
@@ -44,7 +60,7 @@ export default function FolderVirtualizedTree({
 }) {
   const [treeData, setTreeData] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedKeys, setSelectedKeys] = useState<string[]>(['all'])
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [filterText, setFilterText] = useState('')
   const [currentSort, setCurrentSort] = useState<SortType>(SORT_TYPES.CREATE_TIME_DESC)
   const [hoverNodeId, setHoverNodeId] = useState<string | undefined>(undefined)
@@ -70,16 +86,19 @@ export default function FolderVirtualizedTree({
     folderApi
       .getFolder(source as string, {})
       .then((ok: any) => {
-        const raw = Array.isArray(ok.data) ? ok.data : (ok.data?.records || ok.data?.children || [])
-        const folders = raw
-          .filter((f: any) => f.id)
-          .map((f: any) => {
-            const children = f.children
-              ? f.children.filter((c: any) => c.id).map((c: any) => ({...c, key: c.id, title: c.name, isLeaf: true}))
-              : undefined
-            return {...f, key: f.id, title: f.name, children, icon: <FolderOutlined />}
-          })
+        const arr = Array.isArray(ok.data) ? ok.data : (ok.data?.records || ok.data?.children || [])
+        // 后端返回 [workspace根节点]，真实文件夹在其 children 中；非数组兜底则直接使用列表本身。
+        const rootList = Array.isArray(ok.data) && arr.length ? (arr[0]?.children || []) : arr
+        const folders = buildFolderTree(rootList)
         setTreeData(folders)
+        // 默认选中第一个真实文件夹
+        const root = folders[0]
+        const curId = folderStore.currentFolder?.id
+        const valid = curId && curId !== 'all' && curId !== workspaceId
+        if (root && !valid) {
+          setSelectedKeys([root.key])
+          folderStore.setCurrentFolder({id: root.id, name: root.title})
+        }
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -99,17 +118,21 @@ export default function FolderVirtualizedTree({
   useEffect(() => {
     const id = folderStore.currentFolder?.id
     if (id === 'share') setSelectedKeys(['share'])
-    else if (id && id !== workspaceId) setSelectedKeys([id])
-    else setSelectedKeys(['all'])
-  }, [folderStore.currentFolder, workspaceId])
+    else if (id && id !== 'all' && id !== workspaceId) setSelectedKeys([id])
+    else {
+      const root = treeData[0]
+      setSelectedKeys(root ? [root.key] : [])
+    }
+  }, [folderStore.currentFolder, workspaceId, treeData])
 
-  const handleSelect: TreeProps['onSelect'] = (keys: any[]) => {
+  const handleSelect: TreeProps['onSelect'] = (keys: any[], info: any) => {
     const key = keys[0]
     if (!key) return
     setSelectedKeys([key])
-    const nodeId = key === 'all' ? workspaceId : key
-    folderStore.setCurrentFolder({id: nodeId, name: key === 'all' ? '全部' : key === 'share' ? '共享' : key})
-    onSelect?.(key === 'all' ? {id: nodeId} : {id: key})
+    const isShare = key === 'share'
+    const title = info?.node?.title ?? (isShare ? '共享' : key)
+    folderStore.setCurrentFolder({id: key, name: title})
+    onSelect?.({id: key})
   }
 
   const handleRefresh = useCallback(() => {
@@ -145,7 +168,6 @@ export default function FolderVirtualizedTree({
 
   const displayTreeData = useMemo(() => {
     const items: any[] = []
-    items.push({key: 'all', title: '全部', icon: iconMap.all, isRoot: true})
     if (showShared && userStore.isEE()) {
       items.push({key: 'share', title: '共享', icon: iconMap.share, isRoot: true})
     }
@@ -215,7 +237,7 @@ export default function FolderVirtualizedTree({
       .then(() => {
         folderApi.delFolder(node.id, source).then(() => {
           if (selectedKeys[0] === node.id || selectedKeys[0] === node.key) {
-            const parentId = node.parent_id || 'all'
+            const parentId = node.parent_id || treeData[0]?.id || workspaceId
             folderStore.setCurrentFolder({id: parentId})
           }
           handleRefresh()

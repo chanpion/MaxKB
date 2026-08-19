@@ -1,18 +1,16 @@
 'use client'
 import React, {useEffect, useState} from 'react'
 import {
-  Breadcrumb, Table, Button, Space, Typography, Upload, Tag, message, Modal, Spin,
+  Table, Button, Space, Typography, Upload, Tag, message, Modal, Spin, Card,
   Form, Radio, InputNumber,
 } from 'antd'
-import {HomeOutlined, FileTextOutlined, UploadOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined} from '@ant-design/icons'
+import {FileTextOutlined, UploadOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
 import {useRouter} from '@/i18n/navigation'
-import {useTranslations} from 'next-intl'
 import {documentApi} from '@/lib/api/knowledge/document'
 import {dateFormat} from '@/utils/time'
 
 export default function KnowledgeDocumentPage() {
-  const t = useTranslations('menu')
   const router = useRouter()
   const params = useParams()
   const kid = params.id as string
@@ -30,6 +28,7 @@ export default function KnowledgeDocumentPage() {
     }).catch(() => {}).finally(() => setLoading(false))
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadDocs() }, [kid])
 
   const handleDelete = (docId: string) => {
@@ -95,11 +94,7 @@ export default function KnowledgeDocumentPage() {
   ]
 
   return (
-    <div>
-      <Breadcrumb style={{marginBottom: 12}} items={[
-        {title: <><HomeOutlined /> {t('home')}</>},
-        {title: <><FileTextOutlined /> 知识库详情</>},
-      ]} />
+    <Card style={{borderRadius: 8}}>
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
         <Typography.Title level={4} style={{margin: 0}}>文档管理</Typography.Title>
         <Space>
@@ -157,6 +152,6 @@ export default function KnowledgeDocumentPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </Card>
   )
 }

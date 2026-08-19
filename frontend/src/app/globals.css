@@ -64,12 +64,51 @@ a:hover {
 .align-center {
   align-items: center;
 }
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+.flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+.flex-wrap {
+  flex-wrap: wrap;
+}
 .w-full {
   width: 100%;
 }
 .h-full {
   height: 100%;
 }
+.cursor-pointer {
+  cursor: pointer;
+}
+.text-primary {
+  color: #3370ff;
+}
+.text-secondary {
+  color: #646a73;
+}
+.text-error {
+  color: #f54a45;
+}
+.text-success {
+  color: #34c724;
+}
+.text-warning {
+  color: #ff8800;
+}
+.font-medium {
+  font-weight: 500;
+}
+.font-semibold {
+  font-weight: 600;
+}
+.bg-white {
+  background: #fff;
+}
+
 
 /* Margin */
 .mt-8 {

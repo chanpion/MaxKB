@@ -1,7 +1,7 @@
 'use client'
 import React, {useState} from 'react'
-import {Breadcrumb, Card, Input, Button, Typography, List, Tag, Spin, InputNumber, Space} from 'antd'
-import {HomeOutlined, FileTextOutlined, SearchOutlined} from '@ant-design/icons'
+import {Card, Input, Button, Typography, List, Tag, Spin, InputNumber, Space} from 'antd'
+import {SearchOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
 import {post} from '@/lib/request'
 import {useUserStore} from '@/store'
@@ -32,11 +32,7 @@ export default function HitTestPage() {
   }
 
   return (
-    <div>
-      <Breadcrumb style={{marginBottom: 12}} items={[
-        {title: <><HomeOutlined /> 首页</>},
-        {title: <><FileTextOutlined /> 知识库详情</>},
-      ]} />
+    <>
       <Card style={{borderRadius: 8, marginBottom: 16}}>
         <div style={{display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center'}}>
           <Input value={query} onChange={(e) => setQuery(e.target.value)} onPressEnter={handleSearch}
@@ -70,6 +66,6 @@ export default function HitTestPage() {
             </div>
           </List.Item>
         )} />}
-    </div>
+    </>
   )
 }

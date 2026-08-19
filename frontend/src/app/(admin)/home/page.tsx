@@ -1,9 +1,9 @@
 'use client'
 import {useEffect, useRef, useState} from 'react'
-import {Row, Col, Card, Statistic, Button, Dropdown, Select, DatePicker, Typography, Progress, Empty} from 'antd'
+import {Row, Col, Card, Button, Dropdown, Select, Typography, Progress, Empty} from 'antd'
 import {
   AppstoreOutlined, DatabaseOutlined, FileTextOutlined, MessageOutlined,
-  PlusOutlined, DownOutlined, ArrowRightOutlined,
+  ArrowRightOutlined,
 } from '@ant-design/icons'
 import * as echarts from 'echarts'
 import {useTranslations} from 'next-intl'
@@ -53,6 +53,7 @@ export default function HomePage() {
       }))
     })
     fetchMonitorData(7)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchMonitorData = (days: number) => {
@@ -172,13 +173,13 @@ export default function HomePage() {
   ]
 
   const rankCard = (title: string, data: any[], total: number, valueKey: string) => (
-    <Card style={{borderRadius: 8, minHeight: 360, marginBottom: 16}} styles={{body: {padding: 20}}}>
+    <Card style={{borderRadius: 8, minHeight: 375, marginBottom: 16}} styles={{body: {padding: 24}}}>
       <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 16}}>
         <Typography.Text strong>{title}</Typography.Text>
         <Button type="link" size="small"><ArrowRightOutlined /></Button>
       </div>
       {data.length === 0 ? <Empty /> : data.map((item: any, i: number) => (
-        <div key={i} style={{display: 'flex', alignItems: 'center', marginTop: 16, gap: 12}}>
+        <div key={i} style={{display: 'flex', alignItems: 'center', marginTop: i === 0 ? 24 : 16, gap: 12}}>
           <span style={{width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 600, fontSize: 12, border: '2px solid #fff',
             color: ['#c85719','#2b5fd9','#cc710a'][i] || '#8f959e',
@@ -199,39 +200,62 @@ export default function HomePage() {
     </Card>
   )
 
+  const statBg = ['#ebf1ff', '#f2ebfe', '#ebf9e9', '#fff3e5']
+  const statIconBg = ['#3370FF', '#7F3BF5', '#2CA91F', '#FF8800']
+
   return (
-    <div style={{maxWidth: 1280, margin: '0 auto'}}>
-      {/* Stats Overview */}
+    <div style={{maxWidth: 1280, margin: '0 auto', padding: 16}}>
+      {/* Stats Overview（对齐旧 ResourceAggregation 大卡：左标题+大数字，右 48px 彩色图标底） */}
       <Row gutter={[16, 16]}>
-        {stats.map((s) => (
-          <Col xs={12} sm={12} md={12} lg={6} xl={6} key={s.title}>
-            <Card hoverable styles={{body: {padding: 20}}} style={{borderRadius: 8, cursor: 'pointer'}}>
-              <Statistic title={<span style={{fontSize: 14, color: '#646a73'}}>{s.title}</span>}
-                value={s.value}
-                prefix={<span style={{color: s.color, marginRight: 6, fontSize: 20}}>{s.icon}</span>}
-                valueStyle={{fontSize: 32, fontWeight: 500}} />
+        {stats.map((s, i) => (
+          <Col xs={24} sm={12} md={12} lg={6} xl={6} key={s.title}>
+            <Card hoverable styles={{body: {padding: 24}}} style={{borderRadius: 8, cursor: 'pointer', height: '100%'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                <div>
+                  <Typography.Text style={{fontSize: 14, color: '#646a73'}}>{s.title}</Typography.Text>
+                  <div style={{fontSize: 32, fontWeight: 500, color: '#1f2329', marginTop: 12}}>
+                    {numberFormat(s.value)}
+                  </div>
+                </div>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 8, flexShrink: 0,
+                  background: statBg[i] || '#ebf1ff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{color: statIconBg[i] || '#3370FF', fontSize: 24}}>{s.icon}</span>
+                </div>
+              </div>
             </Card>
           </Col>
         ))}
       </Row>
 
-      {/* Quick Create */}
-      <Card style={{marginTop: 16, borderRadius: 8}} styles={{body: {padding: '16px 24px'}}}>
-        <Typography.Text strong style={{fontSize: 14, marginRight: 24, color: '#1a1a1a'}}>{t('quick')}</Typography.Text>
-        {quickCreateItems.map((item) => (
-          item.children ? (
-            <Dropdown key={item.key} menu={{items: item.children.map((c) => ({key: c.key, label: c.label}))}} trigger={['hover']}>
-              <Button type="link" style={{marginRight: 8, padding: '4px 12px'}}>
-                <PlusOutlined /> {item.label} <DownOutlined />
-              </Button>
-            </Dropdown>
-          ) : (
-            <Button key={item.key} type="link" style={{marginRight: 8, padding: '4px 12px'}}>
-              <PlusOutlined /> {item.label}
-            </Button>
-          )
-        ))}
-      </Card>
+      {/* Quick Create（对齐旧 QuickCreate 4 张大卡片：icon+标题+描述+箭头，hover 下拉） */}
+      <div style={{marginTop: 16}}>
+        <Typography.Text strong style={{fontSize: 16, color: '#1f2329', display: 'block', marginBottom: 12}}>
+          {t('quick')}
+        </Typography.Text>
+        <Row gutter={[16, 16]}>
+          {quickCreateItems.map((item) => (
+            <Col xs={24} sm={12} md={12} lg={6} xl={6} key={item.key}>
+              <Dropdown
+                menu={item.children ? {items: item.children.map((c) => ({key: c.key, label: c.label}))} : undefined}
+                trigger={item.children ? ['hover'] : undefined}
+              >
+                <Card hoverable style={{borderRadius: 8, height: '100%'}} styles={{body: {padding: 20}}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <Typography.Text strong style={{fontSize: 15, color: '#1f2329'}}>{item.label}</Typography.Text>
+                    <ArrowRightOutlined style={{color: '#646a73', fontSize: 14}} />
+                  </div>
+                  <Typography.Text type="secondary" style={{fontSize: 13, display: 'block', marginTop: 6}}>
+                    {item.children ? `${item.children.length} 种创建方式` : '配置与部署'}
+                  </Typography.Text>
+                </Card>
+              </Dropdown>
+            </Col>
+          ))}
+        </Row>
+      </div>
 
       {/* Statistics & Charts */}
       <Card style={{marginTop: 16, borderRadius: 8}} title={
@@ -243,26 +267,26 @@ export default function HomePage() {
       }>
         <Row gutter={[16, 16]}>
           {monitorCards.map((m) => (
-            <Col xs={12} sm={12} md={12} lg={8} xl={8} key={m.id}>
-              <Card style={{borderRadius: 8}} styles={{body: {padding: 12}}}>
+            <Col xs={24} sm={24} md={12} lg={8} xl={8} key={m.id}>
+              <Card style={{borderRadius: 8}} styles={{body: {padding: 24}}}>
                 <Typography.Text type="secondary" style={{fontSize: 13}}>{m.name}</Typography.Text>
                 <Typography.Title level={3} style={{margin: '4px 0 0'}}>{numberFormat(m.sum[0])}</Typography.Title>
               </Card>
             </Col>
           ))}
         </Row>
-        <Row gutter={[16, 16]} style={{marginTop: 8}}>
+        <Row gutter={[16, 16]} style={{marginTop: 16}}>
           <Col xs={24} sm={24} md={12} lg={12} xl={12}>
-            <Card style={{borderRadius: 8}}><div ref={chartRef1} style={{height: 280}} /></Card>
+            <Card style={{borderRadius: 8}}><div ref={chartRef1} style={{height: 316}} /></Card>
           </Col>
           <Col xs={24} sm={24} md={12} lg={12} xl={12}>
-            <Card style={{borderRadius: 8}}><div ref={chartRef2} style={{height: 280}} /></Card>
+            <Card style={{borderRadius: 8}}><div ref={chartRef2} style={{height: 316}} /></Card>
           </Col>
           <Col xs={24} sm={24} md={12} lg={12} xl={12}>
-            <Card style={{borderRadius: 8}}><div ref={chartRef3} style={{height: 280}} /></Card>
+            <Card style={{borderRadius: 8}}><div ref={chartRef3} style={{height: 316}} /></Card>
           </Col>
           <Col xs={24} sm={24} md={12} lg={12} xl={12}>
-            <Card style={{borderRadius: 8}}><div ref={chartRef4} style={{height: 280}} /></Card>
+            <Card style={{borderRadius: 8}}><div ref={chartRef4} style={{height: 316}} /></Card>
           </Col>
         </Row>
       </Card>

@@ -1,10 +1,10 @@
 'use client'
 import React, {useEffect, useState} from 'react'
 import {
-  Breadcrumb, Form, Input, Button, Card, message, Spin, Typography,
+  Form, Input, Button, Card, message, Spin, Typography,
   Select, Slider, InputNumber, Tooltip, Modal, Tag,
 } from 'antd'
-import {HomeOutlined, FileTextOutlined, SaveOutlined} from '@ant-design/icons'
+import {SaveOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
 import knowledgeApi from '@/lib/api/knowledge/knowledge'
 
@@ -52,6 +52,7 @@ export default function KnowledgeSettingPage() {
       const merged = [...(md.model ?? []), ...(md.shared_model ?? [])]
       setEmbeddingModels(merged)
     }).catch(() => {}).finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kid])
 
   const doSave = (payload: any, reEmbed: boolean) => {
@@ -108,11 +109,7 @@ export default function KnowledgeSettingPage() {
   const typeInfo = TYPE_INFO[detail.type as number]
 
   return (
-    <div>
-      <Breadcrumb style={{marginBottom: 12}} items={[
-        {title: <><HomeOutlined /> 首页</>},
-        {title: <><FileTextOutlined /> 知识库详情</>},
-      ]} />
+    <>
       <Card style={{borderRadius: 8}}>
         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 16}}>
           <Typography.Title level={5} style={{margin: 0}}>知识库设置</Typography.Title>
@@ -197,6 +194,6 @@ export default function KnowledgeSettingPage() {
         <p>修改向量模型后需要重新向量化，否则检索结果将不准确。</p>
         <p>是否立即重新向量化？</p>
       </Modal>
-    </div>
+    </>
   )
 }

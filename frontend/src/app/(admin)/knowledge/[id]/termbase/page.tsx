@@ -1,7 +1,7 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Card, Table, Button, Typography, Input, Space, message, Popconfirm, Modal, Tag} from 'antd'
-import {HomeOutlined, FileTextOutlined, PlusOutlined, DeleteOutlined} from '@ant-design/icons'
+import {Card, Table, Button, Typography, Input, Space, message, Popconfirm, Modal, Tag} from 'antd'
+import {PlusOutlined, DeleteOutlined} from '@ant-design/icons'
 import {useParams} from 'next/navigation'
 import {termbaseApi} from '@/lib/api/knowledge/termbase'
 import {dateFormat} from '@/utils/time'
@@ -23,6 +23,7 @@ export default function TermbasePage() {
       setData(res.data?.records || res.data || [])
     }).catch(() => {}).finally(() => setLoading(false))
   }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [kid])
 
   const handleCreate = () => {
@@ -37,11 +38,7 @@ export default function TermbasePage() {
   }
 
   return (
-    <div>
-      <Breadcrumb style={{marginBottom: 12}} items={[
-        {title: <><HomeOutlined /> 首页</>},
-        {title: <><FileTextOutlined /> 知识库详情</>},
-      ]} />
+    <>
       <Card style={{borderRadius: 8}}>
         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 16}}>
           <Typography.Title level={5} style={{margin: 0}}>术语库</Typography.Title>
@@ -67,6 +64,6 @@ export default function TermbasePage() {
         <Typography.Text>输入术语内容：</Typography.Text>
         <Input value={newTerm} onChange={(e) => setNewTerm(e.target.value)} placeholder="请输入术语" style={{marginTop: 8}} />
       </Modal>
-    </div>
+    </>
   )
 }

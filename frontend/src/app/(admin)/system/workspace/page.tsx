@@ -1,13 +1,11 @@
 'use client'
 import React, {useEffect, useState} from 'react'
-import {Breadcrumb, Table, Button, Space, Typography, Modal, Form, Input, message, Spin} from 'antd'
-import {HomeOutlined, TeamOutlined, PlusOutlined} from '@ant-design/icons'
-import {useTranslations} from 'next-intl'
+import {Card, Table, Button, Typography, Modal, Form, Input, message, Spin} from 'antd'
+import {PlusOutlined} from '@ant-design/icons'
 import {systemApi} from '@/lib/api/system'
 import {dateFormat} from '@/utils/time'
 
 export default function WorkspacePage() {
-  const t = useTranslations('menu')
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -25,8 +23,7 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div>
-      <Breadcrumb style={{marginBottom: 16}} items={[{title: <><HomeOutlined /> {t('home')}</>}, {title: <><TeamOutlined /> 工作区管理</>}]} />
+    <Card style={{borderRadius: 8}}>
       <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 16}}>
         <Typography.Title level={4} style={{margin: 0}}>工作区管理</Typography.Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>创建工作区</Button>
@@ -41,6 +38,6 @@ export default function WorkspacePage() {
           <Form.Item name="name" label="名称" rules={[{required: true}]}><Input /></Form.Item>
         </Form>
       </Modal>
-    </div>
+    </Card>
   )
 }

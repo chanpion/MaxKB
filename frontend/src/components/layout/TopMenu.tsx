@@ -43,15 +43,13 @@ export default function TopMenu() {
               fontSize: 14,
               fontWeight: active ? 600 : 400,
               color: active
-                ? isDark
-                  ? '#1677FF'
-                  : '#1677FF'
+                ? '#3370FF'
                 : isDark
                   ? 'rgba(255,255,255,0.75)'
                   : '#4a4d54',
               background: active
                 ? isDark
-                  ? 'rgba(22,119,255,0.15)'
+                  ? 'rgba(51,112,255,0.2)'
                   : '#ffffff'
                 : 'transparent',
               boxShadow: active ? '0px 2px 4px rgba(0,0,0,0.08)' : 'none',
